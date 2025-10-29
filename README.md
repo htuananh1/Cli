@@ -1,226 +1,291 @@
-# AI Gateway CLI v2.1
+# AI Code CLI
 
-> **Talk to AI models with unlimited context** - Inspired by [gemini-cli](https://github.com/google-gemini/gemini-cli)
+> **Cursor-like CLI tool for AI coding assistant** - 99% similar to Cursor CLI
 
-A simple, powerful command-line interface for interacting with AI models through AI Gateway. Built with TypeScript and designed for natural conversations without token limits.
-
-## ✨ Features
-
-### Core AI Features
-- 🚀 **Simple & Fast**: Just type and chat, no complex commands
-- 💬 **Interactive REPL**: Gemini-CLI inspired conversational interface
-- ♾️ **Unlimited Context**: No token limits - let the API handle it
-- 📁 **File Support**: Chat about code and documents
-- 🎨 **Beautiful Output**: Colored, streaming responses
-- 🔄 **Conversation Memory**: History maintained in session
-- 🎯 **Multiple Models**: DeepSeek, GPT-4, Claude, Gemini, and more
-
-### 🆕 Enhanced System Features
-- 🔧 **Shell Execution**: Run any shell command with full system access
-- 📝 **Interactive File Editor**: Built-in editor with syntax highlighting
-- 🗂️ **Directory Navigation**: Browse and explore file systems
-- 🔍 **File Search**: Find files using glob patterns
-- 📊 **Command History**: Track and reuse previous commands
-- 🎨 **Multiple Themes**: Default, Dark, Light, and Rainbow themes
-- ⚡ **Progress Indicators**: Visual feedback for long operations
-- 🎭 **Animations**: Beautiful welcome screens and transitions
+A powerful command-line interface for interacting with AI coding assistants. Built with TypeScript and inspired by Cursor CLI, providing comprehensive code generation, editing, review, and analysis capabilities.
 
 ## 🚀 Quick Start
 
 ### Installation
 
-#### Option 1: Install from Source
-
 ```bash
-# Clone the repository
+# Install globally
+npm install -g ai-code-cli
+
+# Or use npx
+npx ai-code-cli "your question"
+
+# Or from source
 git clone <repository-url>
-cd ai-gateway-cli
-
-# Install dependencies
+cd ai-code-cli
 npm install
-
-# Build the project
 npm run build
-
-# Link globally to use 'ai-gateway' command anywhere
 npm link
 ```
 
-#### Option 2: Install via NPM (if published)
+### Initial Setup
 
 ```bash
-# Install globally
-npm install -g ai-gateway-cli
+# Initialize configuration
+ai-code init
 
-# Or use npx without installation
-npx ai-gateway-cli
-```
-
-#### Option 3: Run with ts-node (Development)
-
-```bash
-# Install dependencies
-npm install
-
-# Run directly with ts-node
-npx ts-node src/cli.ts
-```
-
-### Setup API Key
-
-```bash
+# Set API key (or use environment variable)
 export AI_GATEWAY_API_KEY="your-api-key-here"
 ```
 
-### Basic Usage
+## 📖 Core Commands
+
+### 1. Chat & Interactive Mode
 
 ```bash
-# Interactive mode (default)
-ai-gateway
+# Interactive chat session
+ai-code
 
-# One-shot question
-ai-gateway "Why is the sky blue?"
+# One-shot questions
+ai-code "Explain this code pattern"
 
-# With specific model
-ai-gateway "Explain quantum computing" --model openai/gpt-4
+# With file context
+ai-code "Review this code" -f src/utils.js
 
-# With file
-ai-gateway "Review this code" --file ./src/app.ts
+# Multiple files
+ai-code "Compare these files" -f src/file1.js -f src/file2.js
 
-# With system prompt
-ai-gateway --system "You are a helpful coding assistant"
+# Entire directory
+ai-code "Analyze this project" --dir ./src
+```
+
+### 2. Configuration Management
+
+```bash
+# Initialize configuration
+ai-code init
+
+# Show current config
+ai-code config --show
+
+# Set default model
+ai-code config --model claude-sonnet-4
+
+# View all settings
+ai-code config
+```
+
+Configuration is stored in `.aicoderc.json`:
+
+```json
+{
+  "model": "deepseek/deepseek-v3.2-exp",
+  "apiKey": "sk-...",
+  "temperature": 0.7,
+  "maxTokens": 4000,
+  "defaultFiles": ["package.json", "tsconfig.json"],
+  "ignorePatterns": ["node_modules", "dist", "*.min.js"],
+  "autoSave": true,
+  "previewChanges": true
+}
+```
+
+## 🛠️ Code Generation & Editing
+
+### Create Files
+
+```bash
+# Generate new file
+ai-code create "React component for user profile" -o src/UserProfile.jsx
+
+# Create without output path (generates to generated.js)
+ai-code create "Express API endpoint for user authentication"
+```
+
+### Edit Files
+
+```bash
+# Edit with AI
+ai-code edit src/api.js "Add error handling and retry logic"
+
+# Preview changes before applying
+ai-code edit src/app.ts "Refactor to TypeScript strict mode" --preview
+
+# Apply previewed changes
+ai-code apply
+
+# Reject previewed changes
+ai-code reject
+```
+
+## 🔍 Code Review & Analysis
+
+### Review Code
+
+```bash
+# Review single file
+ai-code review src/payment.js
+
+# Review git branch changes
+ai-code review --branch feature/new-api
+```
+
+### Security Audit
+
+```bash
+# Audit file or directory
+ai-code security src/auth/
+ai-code security src/payment.js
+```
+
+### Performance Analysis
+
+```bash
+# Analyze code structure
+ai-code analyze src/
+
+# Performance-specific analysis
+ai-code analyze src/ --performance
+```
+
+## 🐛 Debugging & Testing
+
+### Debug Code
+
+```bash
+# Debug with error message
+ai-code debug "Cannot read property of undefined" -f src/app.js
+
+# Debug without file
+ai-code debug "TypeError: undefined is not a function"
+指引
+```
+
+### Generate Tests
+
+```bash
+# Generate tests for file
+ai-code test src/calculator.js
+
+# Specify test framework
+ai-code test src/api.js --framework jest
+ai-code test src/api.js --framework mocha
+```
+
+### Fix Failing Tests
+
+```bash
+# Fix test file
+ai-code fix-tests tests/api.test.js
+```
+
+## 📝 Documentation
+
+### Generate Documentation
+
+```bash
+# Generate docs for file
+ai-code docs src/api.js
+
+# Creates src/api.md with comprehensive documentation
+```
+
+### Generate README
+
+```bash
+# Generate README for current project
+ai-code readme
+
+# For specific directory
+ai-code readme --project ./my-project
+```
+
+### Add Inline Comments
+
+```bash
+# Add comments to code
+ai-code comment src/complex-logic.js
+```
+
+## 📁 Context Management
+
+```bash
+# Add files to context
+ai-code context add src/models/*.js
+
+# List context files
+ai-code context list
+
+# Clear context
+ai-code context clear
+
+# Save context session
+ai-code context save my-session
+
+# Load saved session
+ai-code context load my-session
+```
+
+## 🔄 Git Integration
+
+### Commit Messages
+
+```bash
+# Generate commit message from staged changes
+ai-code commit
+```
+
+### PR Descriptions
+
+```bash
+# Generate PR description from branch changes
+ai-code pr-description
+```
+
+### Diff Analysis
+
+```bash
+# Compare two files
+ai-code diff file1.js file2.js "Explain the differences"
+
+# Analyze staged changes
+ai-code diff --staged "Review these changes"
 ```
 
 ## 💬 Interactive Mode
 
-Just run `ai-gateway` to start chatting:
+Start an interactive session:
 
-```
-╔════════════════════════════════════════════════════════════╗
-║            AI Gateway CLI - Interactive Mode                ║
-╚════════════════════════════════════════════════════════════╝
-
-Model: deepseek/deepseek-v3.2-exp
-Temperature: 0.7
-
-Commands:
-  /clear     - Clear conversation history
-  /stats     - Show conversation statistics
-  /file      - Chat with file content
-  /model     - Change model
-  /temp      - Change temperature
-  /exit      - Exit (or Ctrl+C)
-  /help      - Show this help
-
-Just type your message and press Enter to chat!
-────────────────────────────────────────────────────────────
-
-You> Hello! How are you?
-
-Assistant> [streaming response...]
+```bash
+ai-code
 ```
 
 ### Interactive Commands
 
-#### AI Commands
-| Command | Description | Example |
-|---------|-------------|---------|
-| `/clear` | Clear conversation history | `/clear` |
-| `/stats` | Show conversation statistics | `/stats` |
-| `/file` | Chat with file content | `/file ./code.ts Review this` |
-| `/model` | Change or view current model | `/model openai/gpt-4` |
-| `/temp` | Change temperature (0.0-2.0) | `/temp 0.9` |
-| `/exit` | Exit interactive mode | `/exit` |
-| `/help` | Show help message | `/help` |
+| Command | Description |
+|---------|-------------|
+| `/clear` | Clear conversation history |
+| `/stats` | Show conversation statistics |
+| `/model <name>` | Change AI model |
+| `/temp <0.0-2.0>` | Change temperature |
+| `/config` | Show configuration |
+| `/help` | Show help |
+| `/exit` | Exit interactive mode |
 
-#### 📁 File Operations (@) - Use @ for all file operations
-| Command | Description | Example |
-|---------|-------------|---------|
-| `@read` | View file with syntax highlighting | `@read src/cli.ts 1 20` |
-| `@edit` | Interactive file editor | `@edit config.json` |
-| `@write` | Create or overwrite file | `@write test.js "console.log('hello')"` |
-| `@append` | Append text to file | `@append log.txt "New entry"` |
-| `@delete` | Delete file or directory | `@delete old-file.txt` |
-| `@ls` | List directory contents | `@ls src/` |
-| `@cd` | Change directory | `@cd ../src` |
-| `@pwd` | Show current directory | `@pwd` |
-| `@find` | Search for files | `@find "*.js"` |
-| `@shell` | Run shell command | `@shell ls -la` |
-| `@interactive` | Run interactive command | `@interactive vim file.txt` |
+### Example Session
 
-#### ⚙️ System Settings (/) - Use / for system settings
-| Command | Description | Example |
-|---------|-------------|---------|
-| `/history` | Show command history | `/history` |
-| `/config` | Show configuration | `/config` |
-| `/theme` | Change UI theme | `/theme rainbow` |
-
-## 📖 Usage Examples
-
-### Quick Questions
-
-```bash
-# Simple question
-ai-gateway "What is recursion?"
-
-# With specific temperature
-ai-gateway "Write a poem" --temperature 1.2
-
-# JSON formatting
-ai-gateway "List 5 colors in JSON format"
 ```
+You> Explain async/await in JavaScript
 
-### Code Review
-
-```bash
-# Review a file
-ai-gateway "Review this code for bugs" --file ./auth.ts
-
-# Interactive code review
-ai-gateway --system "You are a senior code reviewer"
-You> Let's review my authentication system
-You> /file ./auth.ts Analyze security
-You> /file ./db.ts Check database queries
-```
-
-### Learning Sessions
-
-```bash
-# Start learning session
-ai-gateway --system "You are a patient tutor" --model anthropic/claude-3-opus
-
-You> Explain distributed systems
 Assistant> [detailed explanation...]
 
-You> Can you give examples?
-Assistant> [examples with context from previous answer...]
+You> /model claude-sonnet-4
 
-You> How does this relate to microservices?
-Assistant> [connects to earlier discussion...]
-```
+You> Now give me advanced examples
 
-### Creative Writing
+Assistant> [advanced examples...]
 
-```bash
-ai-gateway --temperature 1.0 --system "You are a creative writing partner"
-
-You> Let's write a sci-fi story about AI
-Assistant> [creative ideas...]
-
-You> I like idea #2, develop it more
-Assistant> [builds on previous ideas...]
-```
-
-### File Analysis
-
-```bash
-# Analyze code
-ai-gateway "Explain this code" --file ./complex-algo.ts
-
-# Compare files in interactive mode
-ai-gateway
-You> /file ./v1.ts Analyze this version
-You> /file ./v2.ts Compare with previous version
+You> /stats
+📊 Conversation Stats:
+   Messages: 4
+   User: 2 | Assistant: 2
+   Model: claude-sonnet-4
+   Temperature: 0.7
 ```
 
 ## 🎯 Available Models
@@ -229,194 +294,171 @@ You> /file ./v2.ts Compare with previous version
 
 | Model | Provider | Best For |
 |-------|----------|----------|
-| `anthropic/claude-sonnet-4.5` | Anthropic | Most advanced coding & reasoning |
+| `anthropic/claude-sonnet-4.5` | Anthropic | Advanced coding & reasoning |
 | `anthropic/claude-haiku-4.5` | Anthropic | Fast, efficient tasks |
 | `openai/gpt-5` | OpenAI | Next-gen language understanding |
 | `openai/gpt-5-codex` | OpenAI | Advanced code generation |
 | `google/gemini-2.5-pro` | Google | Multimodal, long context |
-| `google/gemini-2.5-flash` | Google | Fast, efficient processing |
+| `google/gemini-2.5-flash` | Google | Fast processing |
 | `deepseek/deepseek-v3.2-exp` | DeepSeek | Code, reasoning (default) |
 
-### Previous Generation Models
+### Previous Generation
 
-| Model | Provider | Best For |
-|-------|----------|----------|
-| `openai/gpt-4-turbo` | OpenAI | Long context, complex tasks |
-| `openai/gpt-4` | OpenAI | High quality responses |
-| `openai/gpt-3.5-turbo` | OpenAI | Fast, simple tasks |
-| `anthropic/claude-3-opus` | Anthropic | Long documents, analysis |
-| `anthropic/claude-3-sonnet` | Anthropic | Balanced performance |
-| `anthropic/claude-3-haiku` | Anthropic | Fast, simple tasks |
-| `google/gemini-pro` | Google | Multimodal tasks |
+- `openai/gpt-4-turbo`, `openai/gpt-4`, `openai/gpt-3.5-turbo`
+- `anthropic/claude-3-opus`, `anthropic/claude-3-sonnet`, `anthropic/claude-3-haiku`
+- `google/gemini-pro`
 
-View all models:
+## 📋 Complete Command Reference
+
+### Core Commands
+
 ```bash
-ai-gateway --help
+# Chat
+ai-code [message]                    # Chat with AI
+ai-code [message] -f <file>          # Chat with file
+ai-code [message] --dir <dir>        # Chat with directory
+ai-code chat                         # Start interactive session
 
-# Or in interactive mode
-You> /model
+# Configuration
+ai-code init                         # Initialize config
+ai-code config --show                # Show config
+ai-code config --model <model>       # Set model
 ```
 
-### Model Examples
+### Code Operations
 
 ```bash
-# Use Claude Sonnet 4.5 for advanced coding
-ai-gateway --model anthropic/claude-sonnet-4.5 "Refactor this code to use async/await"
+# Generation & Editing
+ai-code create <prompt> [-o <file>]  # Create file
+ai-code edit <file> [instruction]    # Edit file
+ai-code edit <file> --preview        # Preview changes
+ai-code apply                        # Apply changes
+ai-code reject                       # Reject changes
 
-# Use GPT-5 for complex reasoning
-ai-gateway --model openai/gpt-5 "Explain quantum entanglement simply"
+# Review & Analysis
+ai-code review <file>                # Review code
+ai-code security [path]              # Security audit
+ai-code analyze [path]               # Analyze code
+ai-code analyze [path] --performance # Performance analysis
 
-# Use Gemini 2.5 Flash for quick tasks
-ai-gateway --model google/gemini-2.5-flash "Summarize this article"
+# Debugging
+ai-code debug <error> [-f <file>]    # Debug error
+ai-code test <file>                  # Generate tests
+ai-code test <file> --framework <fw> # With framework
+ai-code fix-tests <testfile>         # Fix failing tests
 
-# Use GPT-5 Codex for code generation
-ai-gateway --model openai/gpt-5-codex "Create a REST API with authentication"
+# Documentation
+ai-code docs <file>                  # Generate docs
+ai-code readme [--project <path>]    # Generate README
+ai-code comment <file>               # Add comments
 ```
 
-## 🔧 CLI Options
+### Context & Git
 
 ```bash
-ai-gateway [message] [options]
+# Context Management
+ai-code context add <pattern>        # Add to context
+ai-code context list                 # List context
+ai-code context clear                # Clear context
+ai-code context save <name>          # Save session
+ai-code context load <name>          # Load session
 
-Options:
-  -m, --model <model>         Model to use (default: deepseek/deepseek-v3.2-exp)
-  -t, --temperature <number>  Temperature 0.0-2.0 (default: 0.7)
-  -s, --system <prompt>       System prompt
-  -f, --file <path>           Include file content
-  --api-key <key>             API key (overrides env var)
-  --base-url <url>            API base URL
-  -h, --help                  Show help
-  -V, --version               Show version
+# Git Integration
+ai-code commit                       # Generate commit message
+ai-code pr-description               # Generate PR description
+ai-code diff <file1> <file2> [prompt] # Compare files
+ai-code diff --staged [prompt]       # Analyze staged changes
 ```
 
-## 🌟 Why This CLI?
+## ⚙️ Configuration File
 
-### Inspired by gemini-cli
+Create `.aicoderc.json` in your project root:
 
-This CLI takes inspiration from Google's excellent [gemini-cli](https://github.com/google-gemini/gemini-cli):
+```json
+{
+  "model": "claude-sonnet-4",
+  "apiKey": "sk-...",
+  "temperature": 0.7,
+  "maxTokens": 4000,
+  "defaultFiles": ["package.json", "tsconfig.json"],
+  "ignorePatterns": ["node_modules", "dist", "*.min.js", ".git"],
+  "autoSave": true,
+  "previewChanges": true,
+  "plugins": [],
+  "shortcuts": {
+    "fix": "Fix all errors in this file",
+    "opt": "Optimize performance"
+  },
+  "exclude": ["*.env", "secrets/*"]
+}
+```
 
-- **Simple UX**: No complex commands, just chat naturally
-- **REPL-first**: Interactive mode as the primary interface
-- **Slash commands**: Intuitive `/command` syntax
-- **File support**: Easy file inclusion
-- **Stream by default**: See responses as they're generated
+## 🎨 Usage Examples
 
-### Key Differences
-
-- ♾️ **No Token Limits**: We don't artificially limit context
-- 🎯 **Multiple Models**: Not just one provider
-- 🔄 **In-memory History**: Simple session-based memory
-- 📝 **Simpler**: Focused on core chat experience
-
-## 📚 Examples
-
-### Multi-turn Conversation
+### Code Generation Workflow
 
 ```bash
-ai-gateway
+# 1. Generate component
+ai-code create "React login form component" -o src/Login.jsx
 
-You> I'm building a REST API in Node.js
-Assistant> Great! What kind of API are you building?
+# 2. Review it
+ai-code review src/Login.jsx
 
-You> A todo app backend
-Assistant> [suggestions for todo API...]
+# 3. Add tests
+ai-code test src/Login.jsx --framework jest
 
-You> Show me code for the user authentication
-Assistant> [provides code with context of todo app...]
+# 4. Generate docs
+ai-code docs src/Login.jsx
+```
 
+### Code Review Session
+
+```bash
+# Interactive review
+ai-code
+
+You> /file src/auth.js Review this authentication code
+You> Check for security vulnerabilities
+You> Suggest improvements
 You> /stats
-📊 Conversation Stats:
-   Messages: 6
-   User: 3 | Assistant: 3
-   Model: deepseek/deepseek-v3.2-exp
 ```
 
-### Debug Session
+### Git Workflow
 
 ```bash
-ai-gateway --system "You are a debugging expert"
+# 1. Make changes and stage them
+git add .
 
-You> /file ./app.ts My app crashes on startup
-Assistant> [analyzes code...]
+# 2. Generate commit message
+ai-code commit
 
-You> Here's the error log: [paste error]
-Assistant> [diagnoses with code context...]
+# 3. Create PR description
+ai-code pr-description
 
-You> /temp 0.3  # Lower temperature for precise fixes
-✓ Temperature set to: 0.3
-
-You> What's the fix?
-Assistant> [provides specific solution...]
+# 4. Review diff
+ai-code diff --staged "Are these changes safe?"
 ```
 
-### Brainstorming
+## 🔒 Security
 
-```bash
-ai-gateway -t 1.2 --system "Creative brainstorming partner"
-
-You> App idea: AI-powered task manager
-Assistant> [creative ideas...]
-
-You> Expand on idea #3
-Assistant> [detailed expansion...]
-
-You> Now list technical requirements
-Assistant> [concrete requirements based on brainstorm...]
-```
-
-## 💡 Tips & Tricks
-
-### 1. Use System Prompts
-
-```bash
-ai-gateway --system "You are a Python expert. Always show code examples."
-```
-
-### 2. Adjust Temperature
-
-- **0.0-0.3**: Precise, deterministic (code, facts)
-- **0.4-0.7**: Balanced (default)
-- **0.8-1.5**: Creative (writing, brainstorming)
-- **1.6-2.0**: Very creative (experimental)
-
-### 3. Change Models Mid-conversation
-
-```bash
-You> Explain this concept simply
-Assistant> [explains...]
-
-You> /model openai/gpt-4
-✓ Model changed to: openai/gpt-4
-
-You> Now give me the advanced details
-Assistant> [detailed explanation with new model...]
-```
-
-### 4. File Reviews
-
-```bash
-# In interactive mode
-You> /file ./package.json Review dependencies
-You> /file ./tsconfig.json Check TypeScript config
-You> Are there any conflicts between these configs?
-```
-
-### 5. Keyboard Shortcuts
-
-- `Ctrl+C`: Exit interactive mode
-- `Ctrl+D`: Exit interactive mode (Unix)
+- API keys stored securely in config or environment variables
+- Files matching ignore patterns are excluded
+- Preview mode for review before applying changes
+- Automatic backups before edits
 
 ## 🛠️ Development
 
 ### Project Structure
 
 ```
-ai-gateway-cli/
+ai-code-cli/
 ├── src/
-│   └── cli.ts           # Main CLI (simplified)
-├── dist/                # Compiled output
+│   ├── cli.ts          # Main CLI
+│   ├── config.ts       # Configuration management
+│   ├── context.ts      # Context management
+│   └── edits.ts        # Edit management
+├── dist/               # Compiled output
 ├── package.json
-├── tsconfig.json
 └── README.md
 ```
 
@@ -424,44 +466,59 @@ ai-gateway-cli/
 
 ```bash
 # Development
-npm run dev -- "Hello world"
+npm run dev
 
 # Build
 npm run build
 
-# Run
+# Run compiled
 node dist/cli.js
-
-# Or after npm link
-ai-gateway
 ```
 
-## 🔒 Security
+## 📊 Features Comparison
 
-- API keys stored in environment variables
-- File content read safely
-- No data persisted to disk (session only)
+| Feature | AI Code CLI | Cursor CLI |
+|---------|-------------|------------|
+| Chat with AI | ✅ | ✅ |
+| Code Generation | ✅ | ✅ |
+| Code Editing | ✅ | ✅ |
+| Preview Changes | ✅ | ✅ |
+| Code Review | ✅ | ✅ |
+| Security Audit | ✅ | ✅ |
+| Performance Analysis | ✅ | ✅ |
+| Test Generation | ✅ | ✅ |
+| Documentation | ✅ | ✅ |
+| Git Integration | ✅ | ✅ |
+| Context Management | ✅ | ✅ |
+| Multiple Models | ✅ | ⚠️ Limited |
 
 ## 🐛 Troubleshooting
 
-### "API key not set"
+### API Key Not Found
 
 ```bash
+# Set environment variable
 export AI_GATEWAY_API_KEY="your-key"
-# Or
-ai-gateway --api-key "your-key"
+
+# Or run init
+ai-code init
 ```
 
-### "Model not found"
+### Model Not Available
 
 Check available models:
 ```bash
-ai-gateway --help
+ai-code --help
 ```
 
-### Streaming not working
+### Preview Not Working
 
-Some terminals may not support streaming. The CLI will fall back gracefully.
+Make sure you use `--preview` flag:
+```bash
+ai-code edit file.js "changes" --preview
+ai-code apply  # To apply
+ai-code reject # To cancel
+```
 
 ## 📝 License
 
@@ -469,80 +526,8 @@ MIT
 
 ## 🙏 Credits
 
-Inspired by:
-- [gemini-cli](https://github.com/google-gemini/gemini-cli) - Google's Gemini CLI
-- [AI Gateway](https://ai-gateway.vercel.sh) - Multi-provider AI gateway
+Inspired by Cursor CLI and built with modern AI models through AI Gateway.
 
 ---
 
-**Happy chatting! 🤖💬**
-
-## 📋 System Requirements
-
-- **Node.js**: 16.0.0 or higher
-- **npm**: 7.0.0 or higher
-- **Operating System**: macOS, Linux, or Windows (with WSL recommended)
-- **API Key**: AI Gateway API key (set as `AI_GATEWAY_API_KEY` environment variable)
-
-## Quick Reference
-
-```bash
-# Start interactive mode
-ai-gateway
-
-# Quick question  
-ai-gateway "your question"
-
-# With file
-ai-gateway "review this" --file code.ts
-
-# Use latest models
-ai-gateway --model anthropic/claude-sonnet-4.5 "your question"
-ai-gateway --model openai/gpt-5 "your question"
-ai-gateway --model google/gemini-2.5-pro "your question"
-
-# Creative mode
-ai-gateway --temperature 1.2
-
-# Custom system prompt
-ai-gateway --system "You are a helpful assistant"
-
-# In interactive mode:
-/clear    # Clear history
-/stats    # Show stats
-/file     # Include file
-/model    # Change model (shows all available models)
-/temp     # Change temperature
-/exit     # Quit
-```
-
-## 🔥 Pro Tips
-
-### Best Model for Each Task
-
-```bash
-# Code Generation & Debugging
-ai-gateway --model openai/gpt-5-codex
-
-# Complex Reasoning & Analysis  
-ai-gateway --model anthropic/claude-sonnet-4.5
-
-# Fast Prototyping
-ai-gateway --model google/gemini-2.5-flash
-
-# Long Context Processing
-ai-gateway --model google/gemini-2.5-pro
-
-# General Purpose (Best Balance)
-ai-gateway --model openai/gpt-5
-```
-
-### Environment Variables
-
-```bash
-# Required
-export AI_GATEWAY_API_KEY="your-api-key"
-
-# Optional
-export AI_GATEWAY_BASE_URL="https://ai-gateway.vercel.sh/v1"
-```
+**Happy coding! 🚀**
