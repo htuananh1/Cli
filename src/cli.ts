@@ -226,11 +226,24 @@ class GeminiStyleCLI {
             if (!newModel) {
               console.log(chalk.yellow(`Current model: ${this.config.model}`));
               console.log(chalk.gray('\nAvailable models:'));
-              console.log(chalk.gray('  - deepseek/deepseek-v3.2-exp'));
-              console.log(chalk.gray('  - openai/gpt-4-turbo'));
-              console.log(chalk.gray('  - openai/gpt-4'));
-              console.log(chalk.gray('  - anthropic/claude-3-opus'));
-              console.log(chalk.gray('  - anthropic/claude-3-sonnet'));
+              console.log(chalk.cyan('  DeepSeek:'));
+              console.log(chalk.gray('    - deepseek/deepseek-v3.2-exp'));
+              console.log(chalk.cyan('  OpenAI:'));
+              console.log(chalk.gray('    - openai/gpt-5'));
+              console.log(chalk.gray('    - openai/gpt-5-codex'));
+              console.log(chalk.gray('    - openai/gpt-4-turbo'));
+              console.log(chalk.gray('    - openai/gpt-4'));
+              console.log(chalk.gray('    - openai/gpt-3.5-turbo'));
+              console.log(chalk.cyan('  Anthropic:'));
+              console.log(chalk.gray('    - anthropic/claude-sonnet-4.5'));
+              console.log(chalk.gray('    - anthropic/claude-haiku-4.5'));
+              console.log(chalk.gray('    - anthropic/claude-3-opus'));
+              console.log(chalk.gray('    - anthropic/claude-3-sonnet'));
+              console.log(chalk.gray('    - anthropic/claude-3-haiku'));
+              console.log(chalk.cyan('  Google:'));
+              console.log(chalk.gray('    - google/gemini-2.5-pro'));
+              console.log(chalk.gray('    - google/gemini-2.5-flash'));
+              console.log(chalk.gray('    - google/gemini-pro'));
             } else {
               this.config.model = newModel;
               console.log(chalk.green(`✓ Model changed to: ${newModel}\n`));
