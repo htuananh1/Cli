@@ -1,468 +1,416 @@
-# AI Gateway CLI v2.0
+# AI Gateway CLI v2.1
 
-A powerful command-line interface for interacting with AI models through the AI Gateway service. Built with TypeScript and Node.js, this CLI provides an easy way to chat with various AI models including DeepSeek, OpenAI GPT, Claude, Gemini, and more.
+> **Talk to AI models with unlimited context** - Inspired by [gemini-cli](https://github.com/google-gemini/gemini-cli)
 
-## 🆕 Version 2.0 - Memory & Token Management
+A simple, powerful command-line interface for interacting with AI models through AI Gateway. Built with TypeScript and designed for natural conversations without token limits.
 
-**NEW in v2.0:**
-- 🧠 **Conversation Memory**: Save and load conversations with full context
-- 📊 **Token Counting**: Real-time token usage tracking and display
-- 🔄 **Auto Context Management**: Automatic trimming when token limits reached
-- 💾 **Persistent Storage**: All conversations saved to disk
-- 📤 **Export to Markdown**: Share conversations easily
-- 📚 **Conversation Management**: List, show, delete conversations
+## ✨ Features
 
-## Features
+- 🚀 **Simple & Fast**: Just type and chat, no complex commands
+- 💬 **Interactive REPL**: Gemini-CLI inspired conversational interface
+- ♾️ **Unlimited Context**: No token limits - let the API handle it
+- 📁 **File Support**: Chat about code and documents
+- 🎨 **Beautiful Output**: Colored, streaming responses
+- 🔄 **Conversation Memory**: History maintained in session
+- 🎯 **Multiple Models**: DeepSeek, GPT-4, Claude, Gemini, and more
 
-- 🚀 **Simple Chat Interface**: Send single prompts or have interactive conversations
-- 🔄 **Streaming Support**: Real-time streaming responses with beautiful output
-- 🎯 **Multiple Models**: Support for various AI models (DeepSeek, GPT-4, Claude, etc.)
-- 💾 **JSON Output**: Get structured JSON responses for programmatic use
-- 🎨 **System Prompts**: Customize AI behavior with system prompts
-- ⚙️ **Configurable**: Control temperature, max tokens, and more
-- 🔐 **Secure**: Uses environment variables for API key management
-- 🎭 **Interactive Mode**: Full conversation support with context
-- 🌈 **Colorful Output**: Beautiful terminal UI with colors and spinners
-- 🧠 **Memory System**: Conversations persist across sessions
-- 📊 **Token Management**: Track and optimize token usage
+## 🚀 Quick Start
 
-## Quick Start với npx
-
-Chạy ngay lập tức mà không cần cài đặt:
+### Installation
 
 ```bash
-# Set API key
-export AI_GATEWAY_API_KEY="your-api-key-here"
-
-# Chạy với npx (sau khi publish)
-npx ai-gateway-cli chat "Why is the sky blue?"
-```
-
-## Installation
-
-### Cài đặt toàn cục
-
-```bash
-npm install -g ai-gateway-cli
-```
-
-### Cài đặt cho development
-
-```bash
-# Clone repo
-git clone <repo-url>
-cd ai-gateway-cli
-
-# Cài đặt dependencies
+# Install dependencies
 npm install
 
-# Build project
+# Build
 npm run build
 
-# Link để sử dụng locally
+# Link globally (optional)
 npm link
 ```
 
-## Configuration
-
-Tạo file `.env` trong thư mục dự án hoặc set environment variables:
+### Setup API Key
 
 ```bash
 export AI_GATEWAY_API_KEY="your-api-key-here"
-export AI_GATEWAY_BASE_URL="https://ai-gateway.vercel.sh/v1"  # Optional
 ```
 
-Hoặc copy từ file mẫu:
+### Basic Usage
 
 ```bash
-cp .env.example .env
-# Sau đó edit .env và thêm API key của bạn
+# Interactive mode (default)
+ai-gateway
+
+# One-shot question
+ai-gateway "Why is the sky blue?"
+
+# With specific model
+ai-gateway "Explain quantum computing" --model openai/gpt-4
+
+# With file
+ai-gateway "Review this code" --file ./src/app.ts
+
+# With system prompt
+ai-gateway --system "You are a helpful coding assistant"
 ```
 
-## Usage
+## 💬 Interactive Mode
 
-### Basic Chat
+Just run `ai-gateway` to start chatting:
 
-Gửi một tin nhắn đơn giản:
+```
+╔════════════════════════════════════════════════════════════╗
+║            AI Gateway CLI - Interactive Mode                ║
+╚════════════════════════════════════════════════════════════╝
 
-```bash
-ai-gateway chat "Why is the sky blue?"
+Model: deepseek/deepseek-v3.2-exp
+Temperature: 0.7
+
+Commands:
+  /clear     - Clear conversation history
+  /stats     - Show conversation statistics
+  /file      - Chat with file content
+  /model     - Change model
+  /temp      - Change temperature
+  /exit      - Exit (or Ctrl+C)
+  /help      - Show this help
+
+Just type your message and press Enter to chat!
+────────────────────────────────────────────────────────────
+
+You> Hello! How are you?
+
+Assistant> [streaming response...]
 ```
 
-### 🆕 Chat với Conversation Memory
+### Interactive Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/clear` | Clear conversation history | `/clear` |
+| `/stats` | Show conversation statistics | `/stats` |
+| `/file` | Chat with file content | `/file ./code.ts Review this` |
+| `/model` | Change or view current model | `/model openai/gpt-4` |
+| `/temp` | Change temperature (0.0-2.0) | `/temp 0.9` |
+| `/exit` | Exit interactive mode | `/exit` |
+| `/help` | Show help message | `/help` |
+
+## 📖 Usage Examples
+
+### Quick Questions
 
 ```bash
-# Start với conversation ID để AI nhớ context
-ai-gateway chat "My name is Alice" --conversation-id conv_123
+# Simple question
+ai-gateway "What is recursion?"
 
-# Tiếp tục conversation
-ai-gateway chat "What's my name?" --conversation-id conv_123
-# AI sẽ nhớ: "Your name is Alice"
+# With specific temperature
+ai-gateway "Write a poem" --temperature 1.2
+
+# JSON formatting
+ai-gateway "List 5 colors in JSON format"
 ```
 
-### Với model khác
+### Code Review
 
 ```bash
-ai-gateway chat "Explain quantum computing" --model openai/gpt-4
+# Review a file
+ai-gateway "Review this code for bugs" --file ./auth.ts
+
+# Interactive code review
+ai-gateway --system "You are a senior code reviewer"
+You> Let's review my authentication system
+You> /file ./auth.ts Analyze security
+You> /file ./db.ts Check database queries
 ```
 
-### Với System Prompt
+### Learning Sessions
 
 ```bash
-ai-gateway chat "Write a poem about autumn" --system "You are a creative poet who writes in haiku style"
-```
+# Start learning session
+ai-gateway --system "You are a patient tutor" --model anthropic/claude-3-opus
 
-### Streaming Responses
+You> Explain distributed systems
+Assistant> [detailed explanation...]
 
-Xem response real-time khi AI đang generate:
+You> Can you give examples?
+Assistant> [examples with context from previous answer...]
 
-```bash
-ai-gateway chat "Tell me a story" --stream
-```
-
-### JSON Output
-
-Nhận response dạng JSON để xử lý:
-
-```bash
-ai-gateway chat "Hello, AI!" --json
-```
-
-### 🆕 Interactive Mode với Auto-Save
-
-Bắt đầu cuộc trò chuyện tương tác với memory:
-
-```bash
-# Tự động lưu conversation
-ai-gateway interactive --auto-save
-
-# Hoặc tiếp tục conversation cũ
-ai-gateway interactive --conversation-id conv_123
-```
-
-Trong interactive mode:
-- Gõ tin nhắn và nhận response
-- Gõ `clear` để xóa lịch sử hội thoại
-- Gõ `save` để lưu conversation
-- Gõ `tokens` để xem token usage
-- Gõ `exit` hoặc `quit` để kết thúc
-- Nhấn Ctrl+C để thoát
-
-### Interactive với Custom Model
-
-```bash
-ai-gateway interactive --model anthropic/claude-3-sonnet --auto-save
-```
-
-### 🆕 Conversation Management
-
-```bash
-# List tất cả conversations đã lưu
-ai-gateway conversations
-
-# Xem chi tiết một conversation
-ai-gateway show conv_123456
-
-# Delete conversation
-ai-gateway delete conv_123456
-
-# Export conversation ra markdown
-ai-gateway export conv_123456 output.md
-```
-
-### 🆕 Token Management
-
-```bash
-# Set max context tokens để control memory usage
-ai-gateway interactive --max-context-tokens 10000 --auto-save
-
-# CLI tự động trim old messages khi đạt limit
-```
-
-### Advanced Options
-
-```bash
-ai-gateway chat "Explain AI" \
-  --model openai/gpt-4 \
-  --temperature 0.9 \
-  --max-tokens 500 \
-  --system "You are a helpful AI assistant" \
-  --stream
-```
-
-### List Available Models
-
-```bash
-ai-gateway list-models
-```
-
-## Available Models
-
-CLI hỗ trợ nhiều models với token limits:
-
-| Model | Context Window |
-|-------|----------------|
-| **DeepSeek**: `deepseek/deepseek-v3.2-exp` | 32K tokens |
-| **OpenAI**: `openai/gpt-4-turbo` | 128K tokens |
-| **OpenAI**: `openai/gpt-4` | 8K tokens |
-| **OpenAI**: `openai/gpt-3.5-turbo` | 4K tokens |
-| **Anthropic**: `anthropic/claude-3-opus` | 200K tokens |
-| **Anthropic**: `anthropic/claude-3-sonnet` | 200K tokens |
-| **Anthropic**: `anthropic/claude-3-haiku` | 200K tokens |
-| **Google**: `google/gemini-pro` | 32K tokens |
-| **Meta**: `meta-llama/llama-3-70b` | 8K tokens |
-| **Mistral**: `mistralai/mixtral-8x7b` | 8K tokens |
-
-Xem token limits:
-```bash
-ai-gateway list-models
-```
-
-## Command Reference
-
-### `chat` - Gửi một tin nhắn
-
-```bash
-ai-gateway chat <prompt> [options]
-```
-
-**Options:**
-- `-m, --model <model>`: Model sử dụng (default: deepseek/deepseek-v3.2-exp)
-- `-s, --system <prompt>`: System prompt để set context
-- `-t, --temperature <number>`: Temperature 0-2 (default: 0.7)
-- `--max-tokens <number>`: Số tokens tối đa cho response
-- `--max-context-tokens <number>`: Số tokens tối đa cho context
-- `--stream`: Stream response real-time
-- `--json`: Output dạng JSON
-- `-c, --conversation-id <id>`: Continue từ conversation có sẵn
-
-### `interactive` - Interactive chat session
-
-```bash
-ai-gateway interactive [options]
-```
-
-**Options:**
-- `-m, --model <model>`: Model sử dụng (default: deepseek/deepseek-v3.2-exp)
-- `-s, --system <prompt>`: System prompt để set context
-- `-t, --temperature <number>`: Temperature 0-2 (default: 0.7)
-- `-c, --conversation-id <id>`: Continue từ conversation có sẵn
-- `--max-context-tokens <number>`: Số tokens tối đa cho context
-- `--auto-save`: Tự động lưu conversation
-
-**Interactive Commands:**
-- `exit` / `quit` - Thoát
-- `clear` - Xóa history
-- `save` - Lưu conversation
-- `tokens` - Hiển thị token usage
-
-### `conversations` - List conversations
-
-```bash
-ai-gateway conversations
-# hoặc
-ai-gateway convs
-```
-
-### `show` - Xem chi tiết conversation
-
-```bash
-ai-gateway show <conversation-id>
-```
-
-### `delete` - Xóa conversation
-
-```bash
-ai-gateway delete <conversation-id>
-# hoặc
-ai-gateway rm <conversation-id>
-```
-
-### `export` - Export conversation
-
-```bash
-ai-gateway export <conversation-id> <output-path>
-```
-
-### `list-models` - List các models có sẵn
-
-```bash
-ai-gateway list-models
-```
-
-## Examples
-
-### Code Generation
-
-```bash
-ai-gateway chat "Write a TypeScript function to calculate fibonacci numbers" \
-  --model openai/gpt-4 \
-  --temperature 0.3
-```
-
-### 🆕 Long Code Review Session với Memory
-
-```bash
-# Start review session
-ai-gateway interactive --auto-save \
-  --model openai/gpt-4 \
-  --system "You are an expert code reviewer"
-
-# Review multiple files - AI nhớ tất cả context
-> Review this authentication code...
-> Now check the database layer...
-> Are there any security issues based on what you've seen?
-
-# Sau này quay lại continue
-ai-gateway interactive -c conv_review_123
+You> How does this relate to microservices?
+Assistant> [connects to earlier discussion...]
 ```
 
 ### Creative Writing
 
 ```bash
-ai-gateway chat "Write a short sci-fi story" \
-  --model anthropic/claude-3-opus \
-  --temperature 1.2 \
-  --max-tokens 1000 \
-  --stream
+ai-gateway --temperature 1.0 --system "You are a creative writing partner"
+
+You> Let's write a sci-fi story about AI
+Assistant> [creative ideas...]
+
+You> I like idea #2, develop it more
+Assistant> [builds on previous ideas...]
 ```
 
-### 🆕 Learning Session với Token Management
+### File Analysis
 
 ```bash
-# Start learning with large context
-ai-gateway interactive --auto-save \
-  --model anthropic/claude-3-opus \
-  --max-context-tokens 50000 \
-  --system "You are a patient tutor"
+# Analyze code
+ai-gateway "Explain this code" --file ./complex-algo.ts
 
-# Check token usage anytime
-> tokens
-📊 Token Usage:
-   Current: 12.5K tokens
-   Limit: 200.0K tokens
-   Used: 6.3%
+# Compare files in interactive mode
+ai-gateway
+You> /file ./v1.ts Analyze this version
+You> /file ./v2.ts Compare with previous version
 ```
 
-### Data Analysis Help
+## 🎯 Available Models
+
+| Model | Provider | Best For |
+|-------|----------|----------|
+| `deepseek/deepseek-v3.2-exp` | DeepSeek | Code, reasoning (default) |
+| `openai/gpt-4-turbo` | OpenAI | Long context, complex tasks |
+| `openai/gpt-4` | OpenAI | High quality responses |
+| `openai/gpt-3.5-turbo` | OpenAI | Fast, simple tasks |
+| `anthropic/claude-3-opus` | Anthropic | Long documents, analysis |
+| `anthropic/claude-3-sonnet` | Anthropic | Balanced performance |
+| `anthropic/claude-3-haiku` | Anthropic | Fast, simple tasks |
+| `google/gemini-pro` | Google | Multimodal tasks |
+
+View all models:
+```bash
+ai-gateway --help
+```
+
+## 🔧 CLI Options
 
 ```bash
-ai-gateway interactive \
-  --model openai/gpt-4 \
-  --system "You are a data science expert specializing in Python and pandas"
+ai-gateway [message] [options]
+
+Options:
+  -m, --model <model>         Model to use (default: deepseek/deepseek-v3.2-exp)
+  -t, --temperature <number>  Temperature 0.0-2.0 (default: 0.7)
+  -s, --system <prompt>       System prompt
+  -f, --file <path>           Include file content
+  --api-key <key>             API key (overrides env var)
+  --base-url <url>            API base URL
+  -h, --help                  Show help
+  -V, --version               Show version
 ```
 
-### Get JSON for Parsing
+## 🌟 Why This CLI?
+
+### Inspired by gemini-cli
+
+This CLI takes inspiration from Google's excellent [gemini-cli](https://github.com/google-gemini/gemini-cli):
+
+- **Simple UX**: No complex commands, just chat naturally
+- **REPL-first**: Interactive mode as the primary interface
+- **Slash commands**: Intuitive `/command` syntax
+- **File support**: Easy file inclusion
+- **Stream by default**: See responses as they're generated
+
+### Key Differences
+
+- ♾️ **No Token Limits**: We don't artificially limit context
+- 🎯 **Multiple Models**: Not just one provider
+- 🔄 **In-memory History**: Simple session-based memory
+- 📝 **Simpler**: Focused on core chat experience
+
+## 📚 Examples
+
+### Multi-turn Conversation
 
 ```bash
-ai-gateway chat "List 5 programming languages" --json > response.json
+ai-gateway
+
+You> I'm building a REST API in Node.js
+Assistant> Great! What kind of API are you building?
+
+You> A todo app backend
+Assistant> [suggestions for todo API...]
+
+You> Show me code for the user authentication
+Assistant> [provides code with context of todo app...]
+
+You> /stats
+📊 Conversation Stats:
+   Messages: 6
+   User: 3 | Assistant: 3
+   Model: deepseek/deepseek-v3.2-exp
 ```
 
-### 🆕 Export Conversations
+### Debug Session
 
 ```bash
-# Export important conversation to share
-ai-gateway export conv_123456 meeting-notes.md
+ai-gateway --system "You are a debugging expert"
 
-# Share với team members
+You> /file ./app.ts My app crashes on startup
+Assistant> [analyzes code...]
+
+You> Here's the error log: [paste error]
+Assistant> [diagnoses with code context...]
+
+You> /temp 0.3  # Lower temperature for precise fixes
+✓ Temperature set to: 0.3
+
+You> What's the fix?
+Assistant> [provides specific solution...]
 ```
 
-### Sử dụng trong code TypeScript/JavaScript
-
-```typescript
-import OpenAI from 'openai';
-
-const client = new OpenAI({
-  apiKey: process.env.AI_GATEWAY_API_KEY,
-  baseURL: 'https://ai-gateway.vercel.sh/v1'
-});
-
-const response = await client.chat.completions.create({
-  model: 'deepseek/deepseek-v3.2-exp',
-  messages: [
-    {
-      role: 'user',
-      content: 'Why is the sky blue?'
-    }
-  ]
-});
-
-console.log(response.choices[0].message.content);
-```
-
-## Environment Variables
-
-- `AI_GATEWAY_API_KEY` (required): API key cho authentication
-- `AI_GATEWAY_BASE_URL` (optional): Custom base URL (default: https://ai-gateway.vercel.sh/v1)
-
-## Development
-
-### Build
+### Brainstorming
 
 ```bash
-npm run build
+ai-gateway -t 1.2 --system "Creative brainstorming partner"
+
+You> App idea: AI-powered task manager
+Assistant> [creative ideas...]
+
+You> Expand on idea #3
+Assistant> [detailed expansion...]
+
+You> Now list technical requirements
+Assistant> [concrete requirements based on brainstorm...]
 ```
 
-### Run in Development Mode
+## 💡 Tips & Tricks
+
+### 1. Use System Prompts
 
 ```bash
-npm run dev -- chat "Hello"
+ai-gateway --system "You are a Python expert. Always show code examples."
 ```
 
-### Link Locally
+### 2. Adjust Temperature
+
+- **0.0-0.3**: Precise, deterministic (code, facts)
+- **0.4-0.7**: Balanced (default)
+- **0.8-1.5**: Creative (writing, brainstorming)
+- **1.6-2.0**: Very creative (experimental)
+
+### 3. Change Models Mid-conversation
 
 ```bash
-npm link
-ai-gateway chat "Test message"
+You> Explain this concept simply
+Assistant> [explains...]
+
+You> /model openai/gpt-4
+✓ Model changed to: openai/gpt-4
+
+You> Now give me the advanced details
+Assistant> [detailed explanation with new model...]
 ```
 
-## Project Structure
+### 4. File Reviews
+
+```bash
+# In interactive mode
+You> /file ./package.json Review dependencies
+You> /file ./tsconfig.json Check TypeScript config
+You> Are there any conflicts between these configs?
+```
+
+### 5. Keyboard Shortcuts
+
+- `Ctrl+C`: Exit interactive mode
+- `Ctrl+D`: Exit interactive mode (Unix)
+
+## 🛠️ Development
+
+### Project Structure
 
 ```
 ai-gateway-cli/
 ├── src/
-│   ├── index.ts                 # Main CLI file
-│   ├── conversation-manager.ts  # Conversation storage management
-│   ├── token-counter.ts         # Token counting & optimization
-│   ├── types.ts                 # TypeScript interfaces
-│   └── example.ts               # Example usage
-├── dist/                        # Compiled JavaScript (after build)
-├── package.json                 # NPM configuration
-├── tsconfig.json                # TypeScript configuration
-├── .env.example                 # Environment variables template
-├── README.md                    # Main documentation
-├── MEMORY_FEATURES.md           # Memory & token features guide
-└── QUICKSTART.md               # Quick start guide
+│   └── cli.ts           # Main CLI (simplified)
+├── dist/                # Compiled output
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
 
-## 📁 Storage Location
+### Build & Run
 
-Conversations are saved to: `~/.ai-gateway/conversations/`
+```bash
+# Development
+npm run dev -- "Hello world"
 
-Each conversation is a JSON file with full message history and metadata.
+# Build
+npm run build
 
-## Error Handling
+# Run
+node dist/cli.js
 
-CLI cung cấp error messages rõ ràng cho các vấn đề thường gặp:
+# Or after npm link
+ai-gateway
+```
 
-- Missing API key
-- Network errors
-- Invalid model names
-- Rate limiting
-- Invalid parameters
+## 🔒 Security
 
-## Contributing
+- API keys stored in environment variables
+- File content read safely
+- No data persisted to disk (session only)
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 🐛 Troubleshooting
 
-## License
+### "API key not set"
 
-MIT License
+```bash
+export AI_GATEWAY_API_KEY="your-key"
+# Or
+ai-gateway --api-key "your-key"
+```
 
-## Support
+### "Model not found"
 
-For issues and questions, please open an issue on GitHub.
+Check available models:
+```bash
+ai-gateway --help
+```
+
+### Streaming not working
+
+Some terminals may not support streaming. The CLI will fall back gracefully.
+
+## 📝 License
+
+MIT
+
+## 🙏 Credits
+
+Inspired by:
+- [gemini-cli](https://github.com/google-gemini/gemini-cli) - Google's Gemini CLI
+- [AI Gateway](https://ai-gateway.vercel.sh) - Multi-provider AI gateway
 
 ---
 
-**Happy chatting với AI! 🤖🚀**
+**Happy chatting! 🤖💬**
+
+## Quick Reference
+
+```bash
+# Start interactive mode
+ai-gateway
+
+# Quick question  
+ai-gateway "your question"
+
+# With file
+ai-gateway "review this" --file code.ts
+
+# Change model
+ai-gateway --model openai/gpt-4
+
+# Creative mode
+ai-gateway --temperature 1.2
+
+# Custom system prompt
+ai-gateway --system "You are a helpful assistant"
+
+# In interactive mode:
+/clear    # Clear history
+/stats    # Show stats
+/file     # Include file
+/model    # Change model
+/temp     # Change temperature
+/exit     # Quit
+```

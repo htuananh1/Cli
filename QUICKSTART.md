@@ -1,228 +1,208 @@
-# Quick Start Guide - AI Gateway CLI
+# Quick Start - AI Gateway CLI v2.1
 
-## 🚀 Bắt đầu nhanh
+## 🚀 5-Minute Setup
 
-### 1. Cài đặt
+### 1. Install
 
 ```bash
-# Clone repository
-git clone <your-repo-url>
+git clone <your-repo>
 cd ai-gateway-cli
-
-# Cài đặt dependencies
 npm install
-
-# Build project
 npm run build
-
-# Link để sử dụng globally
 npm link
 ```
 
-### 2. Cấu hình API Key
+### 2. Set API Key
 
 ```bash
-# Set environment variable
 export AI_GATEWAY_API_KEY="your-api-key-here"
-
-# Hoặc tạo file .env
-cp .env.example .env
-# Sau đó edit .env và thêm API key của bạn
 ```
 
-### 3. Sử dụng cơ bản
-
-#### Chat đơn giản
+### 3. Start Chatting!
 
 ```bash
-ai-gateway chat "Why is the sky blue?"
+# Interactive mode
+ai-gateway
+
+# Or quick question
+ai-gateway "Hello, who are you?"
 ```
 
-#### Chat với streaming (real-time response)
+## 💬 Interactive Mode
+
+```
+You> Hello!
+
+Assistant> Hi! How can I help you today?
+
+You> Explain recursion
+
+Assistant> [detailed explanation...]
+
+You> /stats
+📊 Conversation Stats:
+   Messages: 4
+   User: 2 | Assistant: 2
+   Model: deepseek/deepseek-v3.2-exp
+
+You> /exit
+👋 Goodbye!
+```
+
+## 🎯 Common Commands
+
+### Quick Questions
 
 ```bash
-ai-gateway chat "Tell me a story" --stream
+ai-gateway "What is TypeScript?"
+ai-gateway "Write a haiku about coding"
+ai-gateway "Explain async/await"
 ```
 
-#### Sử dụng model khác
+### With Options
 
 ```bash
-ai-gateway chat "Explain AI" --model openai/gpt-4
+# Different model
+ai-gateway "Complex task" --model openai/gpt-4
+
+# Creative writing
+ai-gateway "Write a story" --temperature 1.2
+
+# With system prompt
+ai-gateway --system "You are a Python expert"
 ```
 
-#### Interactive mode
+### File Analysis
 
 ```bash
-ai-gateway interactive
+# One-shot
+ai-gateway "Review this" --file code.ts
+
+# Interactive
+ai-gateway
+You> /file ./app.ts Explain this code
+You> /file ./test.ts Compare with this test
 ```
 
-#### Xem danh sách models
+## 📋 Interactive Commands
+
+| Command | What it does |
+|---------|--------------|
+| `/clear` | Clear conversation history |
+| `/stats` | Show conversation stats |
+| `/file <path> <message>` | Include file content |
+| `/model <name>` | Change model |
+| `/temp <0.0-2.0>` | Change temperature |
+| `/help` | Show all commands |
+| `/exit` | Quit |
+
+## 💡 Pro Tips
+
+### 1. Start Interactive by Default
+
+Just type `ai-gateway` - no commands needed!
+
+### 2. Use System Prompts
 
 ```bash
-ai-gateway list-models
+ai-gateway --system "You are a senior developer doing code review"
 ```
 
-### 4. Ví dụ nâng cao
-
-#### Với system prompt
+### 3. Change Models Mid-Chat
 
 ```bash
-ai-gateway chat "Write a poem" \
-  --system "You are a creative poet" \
-  --temperature 0.9
+You> Simple explanation please
+Assistant> [explains...]
+
+You> /model anthropic/claude-3-opus
+You> Now the advanced version
 ```
 
-#### Lấy JSON output
+### 4. Multiple Files
 
 ```bash
-ai-gateway chat "List 5 colors" --json > output.json
+You> /file ./src/api.ts Review backend
+You> /file ./src/client.ts Check frontend
+You> Are there any inconsistencies?
 ```
 
-#### Interactive với custom settings
+### 5. Temperature Guide
+
+- `0.0-0.3` = Precise (code, math, facts)
+- `0.7` = Balanced (default)
+- `1.0-1.5` = Creative (writing, ideas)
+
+## 🎨 Use Cases
+
+### Code Help
 
 ```bash
-ai-gateway interactive \
-  --model anthropic/claude-3-sonnet \
-  --system "You are a helpful coding assistant" \
-  --temperature 0.5
+ai-gateway --system "TypeScript expert"
+You> How do I use generics?
+You> Show me an example
+You> /file ./types.ts Review my types
 ```
 
-## 📝 Sử dụng trong code
-
-### TypeScript/JavaScript
-
-```typescript
-import OpenAI from 'openai';
-
-const client = new OpenAI({
-  apiKey: process.env.AI_GATEWAY_API_KEY,
-  baseURL: 'https://ai-gateway.vercel.sh/v1'
-});
-
-const response = await client.chat.completions.create({
-  model: 'deepseek/deepseek-v3.2-exp',
-  messages: [
-    {
-      role: 'user',
-      content: 'Why is the sky blue?'
-    }
-  ]
-});
-
-console.log(response.choices[0].message.content);
-```
-
-### Với streaming
-
-```typescript
-const stream = await client.chat.completions.create({
-  model: 'deepseek/deepseek-v3.2-exp',
-  messages: [{ role: 'user', content: 'Tell me a story' }],
-  stream: true,
-});
-
-for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content || '');
-}
-```
-
-## 🎯 Tips & Tricks
-
-### 1. Alias để gõ nhanh hơn
+### Learning
 
 ```bash
-# Thêm vào ~/.bashrc hoặc ~/.zshrc
-alias aig="ai-gateway"
-alias aigc="ai-gateway chat"
-alias aigi="ai-gateway interactive"
-
-# Sau đó sử dụng:
-aigc "Hello AI!"
-aigi
+ai-gateway --model anthropic/claude-3-opus
+You> Teach me about Docker
+You> What are containers?
+You> Show me a Dockerfile example
 ```
 
-### 2. Default model
-
-Bạn có thể set model mặc định bằng alias:
+### Writing
 
 ```bash
-alias aigc4="ai-gateway chat --model openai/gpt-4"
-aigc4 "Complex question here"
+ai-gateway -t 1.0
+You> Help me write a blog post about AI
+You> Make it more engaging
+You> Add a conclusion
 ```
 
-### 3. Pipe output
+## 🔧 Troubleshooting
+
+### API Key Error
 
 ```bash
-# Lưu vào file
-ai-gateway chat "Write a TODO list" > todo.txt
-
-# Combine với các tools khác
-ai-gateway chat "Generate JSON data" --json | jq '.content'
-```
-
-### 4. Multiple API keys
-
-```bash
-# Dev environment
-export AI_GATEWAY_API_KEY="dev-key"
-
-# Production environment
-AI_GATEWAY_API_KEY="prod-key" ai-gateway chat "Test"
-```
-
-## 🔧 Development
-
-### Run without building
-
-```bash
-npm run dev -- chat "Hello"
-```
-
-### Watch mode (rebuild on changes)
-
-```bash
-# Terminal 1: Watch TypeScript
-npx tsc --watch
-
-# Terminal 2: Test commands
-node dist/index.js chat "Test"
-```
-
-## ❓ Troubleshooting
-
-### "AI_GATEWAY_API_KEY not set"
-
-```bash
-# Check if key is set
-echo $AI_GATEWAY_API_KEY
-
 # Set it
 export AI_GATEWAY_API_KEY="your-key"
+
+# Or pass inline
+ai-gateway --api-key "your-key" "Hello"
 ```
 
-### "command not found: ai-gateway"
+### Model Not Available
+
+Check the model name:
+```bash
+ai-gateway --help  # See available options
+```
+
+Common models:
+- `deepseek/deepseek-v3.2-exp` (default)
+- `openai/gpt-4`
+- `anthropic/claude-3-opus`
+
+### Command Not Found
 
 ```bash
-# Re-link the package
+# Make sure you linked it
 cd /path/to/ai-gateway-cli
 npm link
+
+# Or run directly
+node dist/cli.js
 ```
 
-### TypeScript errors
+## 🎯 Next Steps
 
-```bash
-# Clean and rebuild
-rm -rf dist node_modules
-npm install
-npm run build
-```
-
-## 📚 More Resources
-
-- [Full Documentation](README.md)
-- [Example Code](src/example.ts)
-- [OpenAI API Docs](https://platform.openai.com/docs/api-reference)
+- Check out [README.md](README.md) for full documentation
+- Try different models and temperatures
+- Use system prompts for specialized tasks
+- Experiment with `/file` for code reviews
 
 ---
 
-**Chúc bạn code vui vẻ! 🎉**
+**Start chatting now:** `ai-gateway` 🚀

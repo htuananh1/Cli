@@ -1,10 +1,10 @@
 {
   "name": "ai-gateway-cli",
-  "version": "2.0.0",
-  "description": "A powerful command-line interface for interacting with AI Gateway - with conversation memory and token management",
-  "main": "dist/index.js",
+  "version": "2.1.0",
+  "description": "AI Gateway CLI - Talk to AI models with unlimited context (inspired by gemini-cli)",
+  "main": "dist/cli.js",
   "bin": {
-    "ai-gateway": "dist/index.js"
+    "ai-gateway": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
