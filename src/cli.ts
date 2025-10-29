@@ -19,59 +19,81 @@ import * as cliProgress from 'cli-progress';
 import * as emoji from 'node-emoji';
 import { glob } from 'glob';
 import * as mime from 'mime-types';
+import simpleGit, { SimpleGit } from 'simple-git';
+import * as Diff from 'diff';
+import { ConfigManager, AICodeConfig } from './config';
+import { ContextManager } from './context';
+import { EditManager } from './edits';
 
 dotenv.config();
-
-interface Config {
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-  temperature: number;
-  systemPrompt?: string;
-  theme?: 'default' | 'dark' | 'light' | 'rainbow';
-  showEmojis?: boolean;
-  enableAnimations?: boolean;
-}
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
-class GeminiStyleCLI {
-  private client: OpenAI;
-  private config: Config;
+class AICodeCLI {
+  private client: OpenAI | null = null;
+  private config: AICodeConfig & { baseUrl?: string; systemPrompt?: string };
   private conversationHistory: Message[] = [];
   private execAsync = promisify(exec);
   private commandHistory: string[] = [];
   private currentDirectory: string = process.cwd();
   private progressBar: cliProgress.SingleBar | null = null;
+  private configManager: ConfigManager;
+  private contextManager: ContextManager;
+  private editManager: EditManager;
+  private git: SimpleGit;
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(config: Partial<AICodeConfig & { baseUrl?: string; systemPrompt?: string }>) {
+    this.configManager = new ConfigManager();
+    this.contextManager = new ContextManager();
+    this.editManager = new EditManager();
+    this.git = simpleGit(process.cwd());
+    this.config = config as any;
+  }
+
+  async initialize(): Promise<void> {
+    // Load config from file if exists
+    const fileConfig = await this.configManager.load();
+    if (fileConfig) {
+      this.config = { ...fileConfig, ...this.config };
+    }
+
+    // Get API key from config, env, or options
+    const apiKey = this.config.apiKey || process.env.AI_GATEWAY_API_KEY || process.env.OPENAI_API_KEY;
     
-    if (!config.apiKey) {
-      console.error(chalk.red('Error: AI_GATEWAY_API_KEY environment variable not set'));
+    if (!apiKey) {
+      console.error(chalk.red('Error: API key not found'));
       console.error(chalk.gray('Set it with: export AI_GATEWAY_API_KEY="your-key"'));
+      console.error(chalk.gray('Or run: ai-code init'));
       process.exit(1);
     }
 
+    this.config.apiKey = apiKey;
+    this.config.baseUrl = this.config.baseUrl || 'https://ai-gateway.vercel.sh/v1';
+    this.config.model = this.config.model || 'deepseek/deepseek-v3.2-exp';
+    this.config.temperature = this.config.temperature ?? 0.7;
+
     this.client = new OpenAI({
-      apiKey: config.apiKey,
-      baseURL: config.baseUrl,
+      apiKey: this.config.apiKey,
+      baseURL: this.config.baseUrl,
     });
 
-    // Add system prompt if provided
-    if (config.systemPrompt) {
+    if (this.config.systemPrompt) {
       this.conversationHistory.push({
         role: 'system',
-        content: config.systemPrompt,
+        content: this.config.systemPrompt,
       });
     }
+
+    // Load pending edits
+    await this.editManager.loadPending();
   }
 
   async chat(userMessage: string, stream: boolean = true): Promise<string> {
-    // Add user message to history
+    if (!this.client) await this.initialize();
+
     this.conversationHistory.push({
       role: 'user',
       content: userMessage,
@@ -79,10 +101,11 @@ class GeminiStyleCLI {
 
     try {
       if (stream) {
-        const response = await this.client.chat.completions.create({
-          model: this.config.model,
+        const response = await this.client!.chat.completions.create({
+          model: this.config.model!,
           messages: this.conversationHistory,
           temperature: this.config.temperature,
+          max_tokens: this.config.maxTokens,
           stream: true,
         });
 
@@ -92,9 +115,8 @@ class GeminiStyleCLI {
           fullResponse += content;
           process.stdout.write(content);
         }
-        console.log(); // New line after streaming
+        console.log();
 
-        // Add assistant response to history
         this.conversationHistory.push({
           role: 'assistant',
           content: fullResponse,
@@ -102,16 +124,15 @@ class GeminiStyleCLI {
 
         return fullResponse;
       } else {
-        const response = await this.client.chat.completions.create({
-          model: this.config.model,
+        const response = await this.client!.chat.completions.create({
+          model: this.config.model!,
           messages: this.conversationHistory,
           temperature: this.config.temperature,
+          max_tokens: this.config.maxTokens,
           stream: false,
         });
 
         const content = response.choices[0].message.content || '';
-        
-        // Add assistant response to history
         this.conversationHistory.push({
           role: 'assistant',
           content: content,
@@ -125,15 +146,31 @@ class GeminiStyleCLI {
     }
   }
 
-  async chatWithFile(userMessage: string, filePath: string): Promise<string> {
-    try {
-      const fileContent = fs.readFileSync(filePath, 'utf-8');
-      const fullMessage = `${userMessage}\n\nFile content (${path.basename(filePath)}):\n\`\`\`\n${fileContent}\n\`\`\``;
-      return await this.chat(fullMessage);
-    } catch (error: any) {
-      console.error(chalk.red('Error reading file:'), error.message);
-      throw error;
-    }
+  async chatWithFiles(userMessage: string, files: string[]): Promise<string> {
+    const fileContents = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const content = await fs.promises.readFile(file, 'utf-8');
+          return `File: ${file}\n\`\`\`\n${content}\n\`\`\``;
+        } catch {
+          return `File: ${file}\n(Error reading file)`;
+        }
+      })
+    );
+
+    const fullMessage = `${userMessage}\n\n${fileContents.join('\n\n')}`;
+    return await this.chat(fullMessage);
+  }
+
+  async chatWithDirectory(userMessage: string, dir: string): Promise<string> {
+    const files = await glob('**/*', { 
+      cwd: dir,
+      ignore: this.config.ignorePatterns || ['node_modules/**', 'dist/**', '.git/**'],
+      nodir: true
+    });
+
+    const limitedFiles = files.slice(0, 20); // Limit to 20 files
+    return await this.chatWithFiles(userMessage, limitedFiles.map(f => path.join(dir, f)));
   }
 
   clearHistory(): void {
@@ -155,11 +192,14 @@ class GeminiStyleCLI {
     const userMessages = this.conversationHistory.filter(m => m.role === 'user').length;
     const assistantMessages = this.conversationHistory.filter(m => m.role === 'assistant').length;
 
-    this.printPanel('Conversation Stats', [
-      `Messages: ${messageCount}`,
-      `User: ${userMessages} | Assistant: ${assistantMessages}`,
-      `Model: ${this.config.model}`,
-    ]);
+    console.log(chalk.cyan('\n📊 Conversation Stats:'));
+    console.log(chalk.gray('─'.repeat(50)));
+    console.log(`Messages: ${messageCount}`);
+    console.log(`User: ${userMessages} | Assistant: ${assistantMessages}`);
+    console.log(`Model: ${this.config.model}`);
+    console.log(`Temperature: ${this.config.temperature}`);
+    console.log(chalk.gray('─'.repeat(50)));
+    console.log();
   }
 
   private stripAnsi(text: string): string {
@@ -167,118 +207,7 @@ class GeminiStyleCLI {
   }
 
   private getThemedText(text: string, color: string): string {
-    if (!this.config.enableAnimations) {
-      return (chalk as any)[color](text);
-    }
-
-    switch (this.config.theme) {
-      case 'rainbow':
-        return gradient.rainbow(text);
-      case 'dark':
-        return (chalk as any)[color](text);
-      case 'light':
-        return (chalk as any)[color](text);
-      default:
-        return (chalk as any)[color](text);
-    }
-  }
-
-  private async showWelcomeAnimation(): Promise<void> {
-    if (!this.config.enableAnimations) return;
-
-    const title = figlet.textSync('AI Gateway', { font: 'Standard' });
-    const rainbowTitle = gradient.rainbow(title);
-    
-    console.clear();
-    console.log(rainbowTitle);
-    
-    const subtitle = this.getThemedText('Interactive AI Assistant with Full System Access', 'cyan');
-    console.log(subtitle);
-    console.log();
-  }
-
-  private async showProgressBar(total: number, label: string = 'Processing'): Promise<void> {
-    this.progressBar = new cliProgress.SingleBar({
-      format: `${label} |{bar}| {percentage}% | {value}/{total} | ETA: {eta}s`,
-      barCompleteChar: '\u2588',
-      barIncompleteChar: '\u2591',
-      hideCursor: true
-    });
-    
-    this.progressBar.start(total, 0);
-  }
-
-  private updateProgressBar(value: number): void {
-    if (this.progressBar) {
-      this.progressBar.update(value);
-    }
-  }
-
-  private stopProgressBar(): void {
-    if (this.progressBar) {
-      this.progressBar.stop();
-      this.progressBar = null;
-    }
-  }
-
-  private parseArgs(line: string): string[] {
-    const args: string[] = [];
-    let current = '';
-    let quote: string | null = null;
-    let escape = false;
-
-    const pushCurrent = () => {
-      if (current.length > 0) {
-        args.push(current);
-        current = '';
-      }
-    };
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-
-      if (escape) {
-        current += char;
-        escape = false;
-        continue;
-      }
-
-      if (char === '\\' && quote) {
-        escape = true;
-        continue;
-      }
-
-      if (quote) {
-        if (char === quote) {
-          quote = null;
-          continue;
-        }
-
-        current += char;
-        continue;
-      }
-
-      if (char === '"' || char === '\'' || char === '`') {
-        if (current.length > 0) {
-          pushCurrent();
-        }
-        quote = char;
-        continue;
-      }
-
-      if (/\s/.test(char)) {
-        pushCurrent();
-        continue;
-      }
-
-      current += char;
-    }
-
-    if (current.length > 0) {
-      pushCurrent();
-    }
-
-    return args;
+    return (chalk as any)[color](text);
   }
 
   private printPanel(title: string, body: string | string[], color: chalk.Chalk = chalk.cyan): void {
@@ -301,598 +230,25 @@ class GeminiStyleCLI {
     console.log();
   }
 
-  private async executeShellCommand(command: string, interactive: boolean = false): Promise<void> {
-    // Add to command history
-    this.commandHistory.push(command);
-    
-    if (interactive) {
-      await this.executeInteractiveShellCommand(command);
-      return;
-    }
-
-    const spinner = ora({ 
-      text: this.getThemedText(`Running: ${command}`, 'gray'), 
-      spinner: 'dots' 
-    }).start();
-    
-    try {
-      const { stdout, stderr } = await this.execAsync(command, { 
-        maxBuffer: 10 * 1024 * 1024,
-        cwd: this.currentDirectory 
-      });
-      spinner.stop();
-
-      if (stdout.trim()) {
-        this.printPanel('Shell Output', stdout.trim().split('\n'), chalk.green);
-      } else {
-        this.printPanel('Shell Output', ['(no output)'], chalk.green);
-      }
-
-      if (stderr.trim()) {
-        this.printPanel('Shell Errors', stderr.trim().split('\n'), chalk.red);
-      }
-    } catch (error: any) {
-      spinner.stop();
-      const message = error.stderr || error.message || 'Unknown error';
-      this.printPanel('Shell Error', message.toString().trim().split('\n'), chalk.red);
-    }
-  }
-
-  private async executeInteractiveShellCommand(command: string): Promise<void> {
-    return new Promise((resolve) => {
-      const [cmd, ...args] = command.split(' ');
-      const child = spawn(cmd, args, {
-        stdio: 'inherit',
-        cwd: this.currentDirectory,
-        shell: true
-      });
-
-      child.on('close', (code) => {
-        console.log(`\n${this.getThemedText(`Command exited with code: ${code}`, 'gray')}`);
-        resolve();
-      });
-
-      child.on('error', (error) => {
-        console.error(`\n${this.getThemedText(`Error: ${error.message}`, 'red')}`);
-        resolve();
-      });
-    });
-  }
-
-  private async displayFileContent(filePath: string, startLine: number = 1, endLine?: number): Promise<void> {
-    const spinner = ora({ 
-      text: this.getThemedText(`Reading ${filePath}`, 'gray'), 
-      spinner: 'dots' 
-    }).start();
-    
-    try {
-      const absolute = path.resolve(filePath);
-      const stats = await fs.promises.stat(absolute);
-      if (!stats.isFile()) {
-        throw new Error('The specified path is not a file');
-      }
-
-      const content = await fs.promises.readFile(absolute, 'utf-8');
-      spinner.stop();
-      
-      const lines = content.split('\n');
-      const start = Math.max(0, startLine - 1);
-      const end = endLine ? Math.min(lines.length, endLine) : lines.length;
-      const selectedLines = lines.slice(start, end);
-      
-      const formattedLines = selectedLines.map((line, index) => {
-        const lineNumber = this.getThemedText(`${start + index + 1}`.padStart(4, ' '), 'gray');
-        const syntaxHighlighted = this.syntaxHighlight(line, path.extname(filePath));
-        return `${lineNumber} ${syntaxHighlighted}`;
-      });
-      
-      const fileInfo = [
-        `Path: ${path.relative(process.cwd(), absolute)}`,
-        `Size: ${this.formatFileSize(stats.size)}`,
-        `Lines: ${start + 1}-${end} of ${lines.length}`,
-        `Modified: ${stats.mtime.toLocaleString()}`
-      ];
-      
-      this.printPanel(`File: ${path.basename(absolute)}`, fileInfo, chalk.blue);
-      this.printPanel('Content', formattedLines.length ? formattedLines : ['(empty file)']);
-    } catch (error: any) {
-      spinner.stop();
-      this.printPanel('File Read Error', error.message.split('\n'), chalk.red);
-    }
-  }
-
-  private async listDirectory(dirPath: string = '.'): Promise<void> {
-    const spinner = ora({ 
-      text: this.getThemedText(`Listing ${dirPath}`, 'gray'), 
-      spinner: 'dots' 
-    }).start();
-    
-    try {
-      const absolute = path.resolve(dirPath);
-      const items = await fs.promises.readdir(absolute, { withFileTypes: true });
-      
-      const files: string[] = [];
-      const directories: string[] = [];
-      
-      for (const item of items) {
-        const itemPath = path.join(absolute, item.name);
-        const stats = await fs.promises.stat(itemPath);
-        
-        const icon = item.isDirectory() ? '📁' : this.getFileIcon(item.name);
-        const size = item.isDirectory() ? '' : this.formatFileSize(stats.size);
-        const modified = stats.mtime.toLocaleDateString();
-        
-        const info = `${icon} ${item.name.padEnd(30)} ${size.padStart(10)} ${modified}`;
-        
-        if (item.isDirectory()) {
-          directories.push(info);
-        } else {
-          files.push(info);
-        }
-      }
-      
-      spinner.stop();
-      
-      const allItems = [...directories.sort(), ...files.sort()];
-      const header = [
-        `Directory: ${path.relative(process.cwd(), absolute)}`,
-        `Items: ${allItems.length} (${directories.length} directories, ${files.length} files)`
-      ];
-      
-      this.printPanel('Directory Listing', header, chalk.blue);
-      this.printPanel('Contents', allItems.length ? allItems : ['(empty directory)']);
-    } catch (error: any) {
-      spinner.stop();
-      this.printPanel('Directory List Error', error.message.split('\n'), chalk.red);
-    }
-  }
-
-  private getFileIcon(filename: string): string {
-    const ext = path.extname(filename).toLowerCase();
-    const iconMap: { [key: string]: string } = {
-      '.js': '📄',
-      '.ts': '📄',
-      '.json': '📄',
-      '.md': '📝',
-      '.txt': '📝',
-      '.py': '🐍',
-      '.java': '☕',
-      '.cpp': '⚙️',
-      '.c': '⚙️',
-      '.html': '🌐',
-      '.css': '🎨',
-      '.png': '🖼️',
-      '.jpg': '🖼️',
-      '.jpeg': '🖼️',
-      '.gif': '🖼️',
-      '.pdf': '📕',
-      '.zip': '📦',
-      '.tar': '📦',
-      '.gz': '📦'
-    };
-    return iconMap[ext] || '📄';
-  }
-
-  private formatFileSize(bytes: number): string {
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
-  }
-
-  private syntaxHighlight(line: string, extension: string): string {
-    // Basic syntax highlighting
-    if (extension === '.js' || extension === '.ts') {
-      return line
-        .replace(/(['"`])((?:\\.|(?!\1)[^\\])*)\1/g, chalk.yellow('$1$2$1'))
-        .replace(/\b(function|const|let|var|if|else|for|while|return|class|import|export)\b/g, chalk.blue('$1'))
-        .replace(/\b(true|false|null|undefined)\b/g, chalk.magenta('$1'))
-        .replace(/\b(\d+)\b/g, chalk.green('$1'));
-    }
-    return line;
-  }
-
-  private async findFiles(pattern: string): Promise<void> {
-    const spinner = ora({ 
-      text: this.getThemedText(`Searching for: ${pattern}`, 'gray'), 
-      spinner: 'dots' 
-    }).start();
-    
-    try {
-      const files = await glob(pattern, { cwd: this.currentDirectory });
-      
-      spinner.stop();
-      
-      if (files.length === 0) {
-        this.printPanel('Search Results', ['No files found matching the pattern'], chalk.yellow);
-      } else {
-        const formattedFiles = files.map(file => {
-          const icon = this.getFileIcon(file);
-          return `${icon} ${file}`;
-        });
-        
-        this.printPanel(`Search Results (${files.length} files)`, formattedFiles, chalk.green);
-      }
-    } catch (error: any) {
-      spinner.stop();
-      this.printPanel('Search Error', error.message.split('\n'), chalk.red);
-    }
-  }
-
-  private async deleteFileOrDirectory(target: string): Promise<void> {
-    const absolute = path.resolve(this.currentDirectory, target);
-    
-    try {
-      const stats = await fs.promises.stat(absolute);
-      const isDir = stats.isDirectory();
-      
-      // Confirm deletion
-      const { confirm } = await inquirer.prompt([{
-        type: 'confirm',
-        name: 'confirm',
-        message: `Are you sure you want to delete this ${isDir ? 'directory' : 'file'}?`,
-        default: false
-      }]);
-      
-      if (!confirm) {
-        console.log(chalk.yellow('Deletion cancelled'));
-        return;
-      }
-      
-      const spinner = ora({ 
-        text: this.getThemedText(`Deleting ${isDir ? 'directory' : 'file'}...`, 'gray'), 
-        spinner: 'dots' 
-      }).start();
-      
-      if (isDir) {
-        await fs.promises.rmdir(absolute, { recursive: true });
-      } else {
-        await fs.promises.unlink(absolute);
-      }
-      
-      spinner.stop();
-      console.log(chalk.green(`✓ ${isDir ? 'Directory' : 'File'} deleted successfully`));
-    } catch (error: any) {
-      this.printPanel('Delete Error', error.message.split('\n'), chalk.red);
-    }
-  }
-
-  private showCommandHistory(): void {
-    if (this.commandHistory.length === 0) {
-      this.printPanel('Command History', ['No commands in history'], chalk.yellow);
-      return;
-    }
-    
-    const history = this.commandHistory.slice(-20).map((cmd, index) => {
-      const num = (this.commandHistory.length - 20 + index + 1).toString().padStart(3, ' ');
-      return `${num}. ${cmd}`;
-    });
-    
-    this.printPanel('Command History (Last 20)', history, chalk.blue);
-  }
-
-  private showConfiguration(): void {
-    const config = [
-      `Model: ${this.config.model}`,
-      `Temperature: ${this.config.temperature}`,
-      `Theme: ${this.config.theme || 'default'}`,
-      `Show Emojis: ${this.config.showEmojis ? 'Yes' : 'No'}`,
-      `Animations: ${this.config.enableAnimations ? 'Yes' : 'No'}`,
-      `Base URL: ${this.config.baseUrl}`,
-      `Current Directory: ${this.currentDirectory}`,
-      `API Key: ${this.config.apiKey ? '***' + this.config.apiKey.slice(-4) : 'Not set'}`
-    ];
-    
-    this.printPanel('Configuration', config, chalk.cyan);
-  }
-
-  private async handleFileCommand(command: string, args: string[]): Promise<void> {
-    switch (command.toLowerCase()) {
-      case 'read': {
-        const target = args[0];
-        if (!target) {
-          console.log(chalk.red('Usage: @read <file> [start_line] [end_line]'));
-          console.log(chalk.gray('Example: @read cli.ts 1 20'));
-        } else {
-          const startLine = args[1] ? parseInt(args[1]) : 1;
-          const endLine = args[2] ? parseInt(args[2]) : undefined;
-          await this.displayFileContent(target, startLine, endLine);
-        }
-        break;
-      }
-
-      case 'edit': {
-        const target = args[0];
-        if (!target) {
-          console.log(chalk.red('Usage: @edit <file>'));
-          console.log(chalk.gray('Example: @edit config.json'));
-        } else {
-          await this.editFile(target);
-        }
-        break;
-      }
-
-      case 'write': {
-        const [target, ...contentParts] = args;
-        if (!target || contentParts.length === 0) {
-          console.log(chalk.red('Usage: @write <file> <content>'));
-          console.log(chalk.gray('Example: @write test.js "console.log(\'hello\')"'));
-        } else {
-          await this.writeFileContent(target, contentParts.join(' '), false);
-        }
-        break;
-      }
-
-      case 'append': {
-        const [target, ...contentParts] = args;
-        if (!target || contentParts.length === 0) {
-          console.log(chalk.red('Usage: @append <file> <content>'));
-          console.log(chalk.gray('Example: @append log.txt "New entry"'));
-        } else {
-          await this.writeFileContent(target, `${contentParts.join(' ')}\n`, true);
-        }
-        break;
-      }
-
-      case 'delete': {
-        const target = args[0];
-        if (!target) {
-          console.log(chalk.red('Usage: @delete <file_or_directory>'));
-          console.log(chalk.gray('Example: @delete old-file.txt'));
-        } else {
-          await this.deleteFileOrDirectory(target);
-        }
-        break;
-      }
-
-      case 'ls': {
-        const dir = args[0] || '.';
-        await this.listDirectory(dir);
-        break;
-      }
-
-      case 'cd': {
-        const newDir = args[0];
-        if (!newDir) {
-          console.log(chalk.yellow(`Current directory: ${this.currentDirectory}`));
-        } else {
-          try {
-            const absolute = path.resolve(this.currentDirectory, newDir);
-            const stats = await fs.promises.stat(absolute);
-            if (stats.isDirectory()) {
-              this.currentDirectory = absolute;
-              console.log(chalk.green(`✓ Changed to: ${this.currentDirectory}`));
-            } else {
-              console.log(chalk.red('Error: Not a directory'));
-            }
-          } catch (error: any) {
-            console.log(chalk.red(`Error: ${error.message}`));
-          }
-        }
-        break;
-      }
-
-      case 'pwd': {
-        console.log(chalk.cyan(`Current directory: ${this.currentDirectory}`));
-        break;
-      }
-
-      case 'find': {
-        const pattern = args[0];
-        if (!pattern) {
-          console.log(chalk.red('Usage: @find <pattern>'));
-          console.log(chalk.gray('Example: @find "*.js"'));
-        } else {
-          await this.findFiles(pattern);
-        }
-        break;
-      }
-
-      case 'shell': {
-        const command = args.join(' ').trim();
-        if (!command) {
-          console.log(chalk.red('Usage: @shell <command>'));
-          console.log(chalk.gray('Example: @shell ls -la'));
-        } else {
-          await this.executeShellCommand(command, false);
-        }
-        break;
-      }
-
-      case 'interactive': {
-        const command = args.join(' ').trim();
-        if (!command) {
-          console.log(chalk.red('Usage: @interactive <command>'));
-          console.log(chalk.gray('Example: @interactive vim file.txt'));
-        } else {
-          await this.executeShellCommand(command, true);
-        }
-        break;
-      }
-
-      case 'help': {
-        this.printPanel('File Commands (@)', [
-          this.getThemedText('@read <file> [start] [end] - View file with syntax highlighting', 'gray'),
-          this.getThemedText('@edit <file> - Interactive file editor', 'gray'),
-          this.getThemedText('@write <file> <content> - Create or overwrite file', 'gray'),
-          this.getThemedText('@append <file> <content> - Append text to file', 'gray'),
-          this.getThemedText('@delete <file> - Delete file or directory', 'gray'),
-          this.getThemedText('@ls [dir] - List directory contents', 'gray'),
-          this.getThemedText('@cd [dir] - Change directory', 'gray'),
-          this.getThemedText('@pwd - Show current directory', 'gray'),
-          this.getThemedText('@find <pattern> - Search for files', 'gray'),
-          this.getThemedText('@shell <command> - Run shell command', 'gray'),
-          this.getThemedText('@interactive <command> - Run interactive command', 'gray'),
-          this.getThemedText('@help - Show this help', 'gray'),
-        ]);
-        break;
-      }
-
-      default:
-        console.log(chalk.red(`Unknown file command: @${command}`));
-        console.log(chalk.gray('Type @help for available file commands\n'));
-    }
-  }
-
-  private async editFile(filePath: string): Promise<void> {
-    const absolute = path.resolve(this.currentDirectory, filePath);
-    
-    try {
-      // Check if file exists
-      let content = '';
-      try {
-        content = await fs.promises.readFile(absolute, 'utf-8');
-      } catch (error) {
-        // File doesn't exist, create new one
-        console.log(chalk.yellow(`File ${filePath} doesn't exist. Creating new file.`));
-      }
-
-      const lines = content.split('\n');
-      let currentLine = 0;
-      let editing = true;
-
-      console.log(chalk.cyan(`\nEditing: ${filePath}`));
-      console.log(chalk.gray('Commands: :q (quit), :w (save), :n (next line), :p (prev line), :l (list), :d (delete line)'));
-      console.log(chalk.gray('Type text to edit current line, or use commands above\n'));
-
-      while (editing) {
-        const displayLine = Math.max(0, Math.min(currentLine, lines.length - 1));
-        const lineContent = lines[displayLine] || '';
-        
-        console.log(chalk.blue(`Line ${displayLine + 1}: `) + this.syntaxHighlight(lineContent, path.extname(filePath)));
-        
-        const { input } = await inquirer.prompt([{
-          type: 'input',
-          name: 'input',
-          message: '>',
-          prefix: ''
-        }]);
-
-        const command = input.trim();
-
-        if (command.startsWith(':')) {
-          const cmd = command.slice(1);
-          switch (cmd) {
-            case 'q':
-              editing = false;
-              break;
-            case 'w':
-              await fs.promises.writeFile(absolute, lines.join('\n'));
-              console.log(chalk.green('✓ File saved'));
-              break;
-            case 'n':
-              currentLine = Math.min(currentLine + 1, lines.length);
-              break;
-            case 'p':
-              currentLine = Math.max(currentLine - 1, 0);
-              break;
-            case 'l':
-              const start = Math.max(0, currentLine - 5);
-              const end = Math.min(lines.length, currentLine + 6);
-              for (let i = start; i < end; i++) {
-                const marker = i === currentLine ? '→' : ' ';
-                const lineNum = (i + 1).toString().padStart(3, ' ');
-                console.log(chalk.gray(`${marker} ${lineNum}: `) + this.syntaxHighlight(lines[i] || '', path.extname(filePath)));
-              }
-              break;
-            case 'd':
-              if (lines.length > 0) {
-                lines.splice(currentLine, 1);
-                if (currentLine >= lines.length) currentLine = Math.max(0, lines.length - 1);
-                console.log(chalk.red('Line deleted'));
-              }
-              break;
-            default:
-              console.log(chalk.red('Unknown command'));
-          }
-        } else if (command) {
-          // Edit current line
-          if (currentLine >= lines.length) {
-            // Add new line
-            lines.push(command);
-            currentLine = lines.length;
-          } else {
-            // Edit existing line
-            lines[currentLine] = command;
-            currentLine = Math.min(currentLine + 1, lines.length);
-          }
-        }
-      }
-
-      // Ask if user wants to save
-      const { save } = await inquirer.prompt([{
-        type: 'confirm',
-        name: 'save',
-        message: 'Save changes?',
-        default: true
-      }]);
-
-      if (save) {
-        await fs.promises.writeFile(absolute, lines.join('\n'));
-        console.log(chalk.green('✓ File saved'));
-      } else {
-        console.log(chalk.yellow('Changes discarded'));
-      }
-
-    } catch (error: any) {
-      this.printPanel('Edit Error', error.message.split('\n'), chalk.red);
-    }
-  }
-
-  private async writeFileContent(filePath: string, content: string, append: boolean = false): Promise<void> {
-    const absolute = path.resolve(filePath);
-    const action = append ? 'Appending to' : 'Writing to';
-    const spinner = ora({ text: chalk.gray(`${action} ${absolute}`), spinner: 'dots' }).start();
-    try {
-      await fs.promises.mkdir(path.dirname(absolute), { recursive: true });
-      if (append) {
-        await fs.promises.appendFile(absolute, content);
-      } else {
-        await fs.promises.writeFile(absolute, content);
-      }
-      spinner.stop();
-      this.printPanel('File Saved', [`${append ? 'Appended' : 'Wrote'} ${content.length} characters`, `Path: ${path.relative(process.cwd(), absolute)}`], chalk.green);
-    } catch (error: any) {
-      spinner.stop();
-      this.printPanel('File Write Error', error.message.split('\n'), chalk.red);
-    }
-  }
-
   async repl(): Promise<void> {
-    await this.showWelcomeAnimation();
-    
-    this.printPanel('AI Gateway CLI - Interactive Mode', [
+    await this.initialize();
+
+    this.printPanel('AI Code CLI - Interactive Mode', [
       this.getThemedText(`Model: ${this.config.model}`, 'gray'),
       this.getThemedText(`Temperature: ${this.config.temperature}`, 'gray'),
-      this.getThemedText(`Theme: ${this.config.theme || 'default'}`, 'gray'),
-      this.getThemedText(`Directory: ${this.currentDirectory}`, 'gray'),
     ], chalk.green);
 
     this.printPanel('Commands', [
-      this.getThemedText('📁 File Operations (@)', 'cyan'),
-      this.getThemedText('@read <file>     View file with syntax highlighting', 'gray'),
-      this.getThemedText('@edit <file>     Interactive file editor', 'gray'),
-      this.getThemedText('@write <file>    Create or overwrite file', 'gray'),
-      this.getThemedText('@append <file>   Append text to file', 'gray'),
-      this.getThemedText('@delete <file>   Delete file or directory', 'gray'),
-      this.getThemedText('@ls [dir]        List directory contents', 'gray'),
-      this.getThemedText('@cd [dir]        Change directory', 'gray'),
-      this.getThemedText('@pwd             Show current directory', 'gray'),
-      this.getThemedText('@find <pattern>  Search for files', 'gray'),
-      this.getThemedText('@shell <cmd>     Run shell command', 'gray'),
-      this.getThemedText('@interactive     Run interactive command', 'gray'),
-      this.getThemedText('@help            Show file commands help', 'gray'),
+      this.getThemedText('💬 Chat', 'cyan'),
+      this.getThemedText('Type a message to chat with AI', 'gray'),
       this.getThemedText('', 'gray'),
       this.getThemedText('⚙️ System Settings (/)', 'cyan'),
       this.getThemedText('/clear       Clear conversation history', 'gray'),
       this.getThemedText('/stats       Show conversation statistics', 'gray'),
-      this.getThemedText('/file        Chat with file content', 'gray'),
-      this.getThemedText('/history     Show command history', 'gray'),
       this.getThemedText('/model       Change model', 'gray'),
       this.getThemedText('/temp        Change temperature', 'gray'),
-      this.getThemedText('/theme       Change UI theme', 'gray'),
       this.getThemedText('/config      Show configuration', 'gray'),
-      this.getThemedText('/exit        Exit (or Ctrl+C)', 'gray'),
+      this.getThemedText('/exit        Exit', 'gray'),
       this.getThemedText('/help        Show this help', 'gray'),
     ]);
 
@@ -912,23 +268,8 @@ class GeminiStyleCLI {
         return;
       }
 
-      // Handle file operations with @
-      if (input.startsWith('@')) {
-        const [command, ...args] = this.parseArgs(input.slice(1));
-        await this.handleFileCommand(command, args);
-        rl.prompt();
-        return;
-      }
-
-      // Handle system settings with /
       if (input.startsWith('/')) {
-        const [command, ...args] = this.parseArgs(input.slice(1));
-
-        if (!command) {
-          console.log(chalk.red('Please provide a command after "/".'));
-          rl.prompt();
-          return;
-        }
+        const [command, ...args] = input.slice(1).split(' ');
 
         switch (command.toLowerCase()) {
           case 'exit':
@@ -947,118 +288,41 @@ class GeminiStyleCLI {
             this.showStats();
             break;
 
-          case 'file':
-            if (args.length === 0) {
-              console.log(chalk.red('Usage: /file <path> <message>'));
-              console.log(chalk.gray('Example: /file ./code.ts Review this code'));
-            } else {
-              const file = args[0];
-              const message = args.slice(1).join(' ') || 'Analyze this file';
-
-              console.log(chalk.cyan('\nAssistant> '));
-              try {
-                await this.chatWithFile(message, file);
-              } catch (error) {
-                // Error already logged
-              }
-              console.log();
-            }
-            break;
-
-          case 'history': {
-            this.showCommandHistory();
-            break;
-          }
-
-          case 'theme': {
-            const newTheme = args[0];
-            if (!newTheme) {
-              console.log(chalk.yellow(`Current theme: ${this.config.theme || 'default'}`));
-              console.log(chalk.gray('Available themes: default, dark, light, rainbow'));
-            } else {
-              if (['default', 'dark', 'light', 'rainbow'].includes(newTheme)) {
-                this.config.theme = newTheme as any;
-                console.log(chalk.green(`✓ Theme changed to: ${newTheme}`));
-              } else {
-                console.log(chalk.red('Invalid theme. Available: default, dark, light, rainbow'));
-              }
-            }
-            break;
-          }
-
-          case 'config': {
-            this.showConfiguration();
-            break;
-          }
-
           case 'model':
-            const newModel = args.join(' ').trim();
-            if (!newModel) {
+            if (args.length === 0) {
               console.log(chalk.yellow(`Current model: ${this.config.model}`));
-              console.log(chalk.gray('\nAvailable models:'));
-              console.log(chalk.cyan('  DeepSeek:'));
-              console.log(chalk.gray('    - deepseek/deepseek-v3.2-exp'));
-              console.log(chalk.cyan('  OpenAI:'));
-              console.log(chalk.gray('    - openai/gpt-5'));
-              console.log(chalk.gray('    - openai/gpt-5-codex'));
-              console.log(chalk.gray('    - openai/gpt-4-turbo'));
-              console.log(chalk.gray('    - openai/gpt-4'));
-              console.log(chalk.gray('    - openai/gpt-3.5-turbo'));
-              console.log(chalk.cyan('  Anthropic:'));
-              console.log(chalk.gray('    - anthropic/claude-sonnet-4.5'));
-              console.log(chalk.gray('    - anthropic/claude-haiku-4.5'));
-              console.log(chalk.gray('    - anthropic/claude-3-opus'));
-              console.log(chalk.gray('    - anthropic/claude-3-sonnet'));
-              console.log(chalk.gray('    - anthropic/claude-3-haiku'));
-              console.log(chalk.cyan('  Google:'));
-              console.log(chalk.gray('    - google/gemini-2.5-pro'));
-              console.log(chalk.gray('    - google/gemini-2.5-flash'));
-              console.log(chalk.gray('    - google/gemini-pro'));
             } else {
-              this.config.model = newModel;
-              console.log(chalk.green(`✓ Model changed to: ${newModel}\n`));
+              this.config.model = args.join(' ');
+              console.log(chalk.green(`✓ Model changed to: ${this.config.model}\n`));
             }
             break;
 
           case 'temp':
           case 'temperature':
-            const temp = parseFloat(args[0]);
-            if (isNaN(temp)) {
+            if (args.length === 0) {
               console.log(chalk.yellow(`Current temperature: ${this.config.temperature}`));
-              console.log(chalk.gray('Usage: /temp <0.0-2.0>'));
             } else {
-              this.config.temperature = Math.max(0, Math.min(2, temp));
-              console.log(chalk.green(`✓ Temperature set to: ${this.config.temperature}\n`));
+              const temp = parseFloat(args[0]);
+              if (!isNaN(temp)) {
+                this.config.temperature = Math.max(0, Math.min(2, temp));
+                console.log(chalk.green(`✓ Temperature set to: ${this.config.temperature}\n`));
+              }
             }
             break;
 
+          case 'config':
+            await this.configManager.show();
+            break;
+
           case 'help':
-            this.printPanel('Commands', [
-              this.getThemedText('📁 File Operations (@)', 'cyan'),
-              this.getThemedText('@read <file>     View file with syntax highlighting', 'gray'),
-              this.getThemedText('@edit <file>     Interactive file editor', 'gray'),
-              this.getThemedText('@write <file>    Create or overwrite file', 'gray'),
-              this.getThemedText('@append <file>   Append text to file', 'gray'),
-              this.getThemedText('@delete <file>   Delete file or directory', 'gray'),
-              this.getThemedText('@ls [dir]        List directory contents', 'gray'),
-              this.getThemedText('@cd [dir]        Change directory', 'gray'),
-              this.getThemedText('@pwd             Show current directory', 'gray'),
-              this.getThemedText('@find <pattern>  Search for files', 'gray'),
-              this.getThemedText('@shell <cmd>     Run shell command', 'gray'),
-              this.getThemedText('@interactive     Run interactive command', 'gray'),
-              this.getThemedText('@help            Show file commands help', 'gray'),
-              this.getThemedText('', 'gray'),
-              this.getThemedText('⚙️ System Settings (/)', 'cyan'),
-              this.getThemedText('/clear       Clear conversation history', 'gray'),
-              this.getThemedText('/stats       Show conversation statistics', 'gray'),
-              this.getThemedText('/file        Chat with file content', 'gray'),
-              this.getThemedText('/history     Show command history', 'gray'),
-              this.getThemedText('/model       Change model', 'gray'),
-              this.getThemedText('/temp        Change temperature', 'gray'),
-              this.getThemedText('/theme       Change UI theme', 'gray'),
-              this.getThemedText('/config      Show configuration', 'gray'),
-              this.getThemedText('/exit        Exit', 'gray'),
-              this.getThemedText('/help        Show this help', 'gray'),
+            this.printPanel('Available Commands', [
+              '/clear       Clear conversation history',
+              '/stats       Show conversation statistics',
+              '/model       Change model',
+              '/temp        Change temperature',
+              '/config      Show configuration',
+              '/exit        Exit',
+              '/help        Show this help',
             ]);
             break;
 
@@ -1100,43 +364,71 @@ class GeminiStyleCLI {
 const program = new Command();
 
 program
-  .name('ai-gateway')
-  .description('AI Gateway CLI - Talk to AI models with unlimited context')
-  .version('2.1.0');
+  .name('ai-code')
+  .description('AI Code CLI - Cursor-like CLI tool for AI coding assistant')
+  .version('1.0.0');
 
-// Default interactive mode (like gemini-cli)
+// Init command
 program
-  .argument('[message]', 'Message to send (starts interactive mode if not provided)')
-  .option('-m, --model <model>', 'Model to use', 'deepseek/deepseek-v3.2-exp')
+  .command('init')
+  .description('Initialize configuration')
+  .action(async () => {
+    const configManager = new ConfigManager();
+    await configManager.init();
+  });
+
+// Config command
+program
+  .command('config')
+  .description('Manage configuration')
+  .option('--model <model>', 'Set default model')
+  .option('--show', 'Show current configuration')
+  .action(async (options) => {
+    const configManager = new ConfigManager();
+    
+    if (options.show) {
+      await configManager.show();
+    } else if (options.model) {
+      await configManager.update('model', options.model);
+      console.log(chalk.green(`✓ Model set to: ${options.model}`));
+    } else {
+      await configManager.show();
+    }
+  });
+
+// Chat command (default)
+program
+  .argument('[message]', 'Message to send')
+  .option('-m, --model <model>', 'Model to use')
   .option('-t, --temperature <number>', 'Temperature (0.0-2.0)', '0.7')
   .option('-s, --system <prompt>', 'System prompt')
-  .option('-f, --file <path>', 'Include file content')
-  .option('--api-key <key>', 'API key (overrides AI_GATEWAY_API_KEY env var)')
-  .option('--base-url <url>', 'Base URL for AI Gateway', 'https://ai-gateway.vercel.sh/v1')
-  .option('--theme <theme>', 'UI theme (default, dark, light, rainbow)', 'default')
-  .option('--no-emojis', 'Disable emojis')
-  .option('--no-animations', 'Disable animations')
+  .option('-f, --file <path>', 'Include file content (can be used multiple times)', (val: string, prev: string[] | undefined) => {
+    prev = prev || [];
+    prev.push(val);
+    return prev;
+  })
+  .option('--dir <directory>', 'Include directory content')
+  .option('--api-key <key>', 'API key')
+  .option('--base-url <url>', 'Base URL', 'https://ai-gateway.vercel.sh/v1')
   .action(async (message: string | undefined, options: any) => {
-    const config: Config = {
-      apiKey: options.apiKey || process.env.AI_GATEWAY_API_KEY || '',
-      baseUrl: options.baseUrl,
+    const cli = new AICodeCLI({
       model: options.model,
       temperature: parseFloat(options.temperature),
       systemPrompt: options.system,
-      theme: options.theme,
-      showEmojis: options.emojis !== false,
-      enableAnimations: options.animations !== false,
-    };
+      apiKey: options.apiKey,
+      baseUrl: options.baseUrl,
+    });
 
-    const cli = new GeminiStyleCLI(config);
+    await cli.initialize();
 
-    // If message provided, one-shot mode
     if (message) {
       try {
         console.log(chalk.cyan('Assistant> '));
         
-        if (options.file) {
-          await cli.chatWithFile(message, options.file);
+        if (options.dir) {
+          await cli.chatWithDirectory(message, options.dir);
+        } else if (options.file && options.file.length > 0) {
+          await cli.chatWithFiles(message, options.file);
         } else {
           await cli.chat(message);
         }
@@ -1146,9 +438,559 @@ program
         process.exit(1);
       }
     } else {
-      // Interactive REPL mode
       await cli.repl();
     }
+  });
+
+// Create command
+program
+  .command('create')
+  .description('Create new file with AI')
+  .argument('<prompt>', 'Description of what to create')
+  .option('-o, --output <path>', 'Output file path')
+  .action(async (prompt: string, options: any) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    const spinner = ora('Generating code...').start();
+    try {
+      const response = await cli.chat(`Create code for: ${prompt}. Provide complete, production-ready code.`, false);
+      spinner.stop();
+
+      // Extract code blocks if present
+      const codeMatch = response.match(/```[\s\S]*?\n([\s\S]*?)```/);
+      const code = codeMatch ? codeMatch[1].trim() : response;
+
+      const outputPath = options.output || 'generated.js';
+      await fs.promises.writeFile(outputPath, code, 'utf-8');
+      console.log(chalk.green(`✓ File created: ${outputPath}`));
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error generating code'));
+      process.exit(1);
+    }
+  });
+
+// Edit command
+program
+  .command('edit')
+  .description('Edit file with AI')
+  .argument('<file>', 'File to edit')
+  .argument('[instruction]', 'What to change')
+  .option('--preview', 'Preview changes before applying')
+  .action(async (file: string, instruction: string | undefined, options: any) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+    const editManager = new EditManager();
+
+    if (!await fs.promises.access(file).then(() => true).catch(() => false)) {
+      console.error(chalk.red(`File not found: ${file}`));
+      process.exit(1);
+    }
+
+    const originalContent = await fs.promises.readFile(file, 'utf-8');
+    const prompt = instruction || 'Improve and refactor this code';
+
+    const spinner = ora('Generating edits...').start();
+    try {
+      const response = await cli.chat(`File content:\n\`\`\`\n${originalContent}\n\`\`\`\n\n${prompt}. Provide the complete modified code.`, false);
+      spinner.stop();
+
+      // Extract code blocks
+      const codeMatch = response.match(/```[\s\S]*?\n([\s\S]*?)```/);
+      const newContent = codeMatch ? codeMatch[1].trim() : response;
+
+      const config = await cli['configManager'].load();
+      if (options.preview || config?.previewChanges !== false) {
+        await editManager.preview(file, newContent);
+      } else {
+        await fs.promises.writeFile(file, newContent, 'utf-8');
+        console.log(chalk.green(`✓ File edited: ${file}`));
+      }
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error editing file'));
+      process.exit(1);
+    }
+  });
+
+// Apply command
+program
+  .command('apply')
+  .description('Apply pending changes')
+  .action(async () => {
+    const editManager = new EditManager();
+    await editManager.apply();
+  });
+
+// Reject command
+program
+  .command('reject')
+  .description('Reject pending changes')
+  .action(async () => {
+    const editManager = new EditManager();
+    await editManager.reject();
+  });
+
+// Review command
+program
+  .command('review')
+  .description('Review code')
+  .argument('<file>', 'File to review')
+  .option('--branch <branch>', 'Review branch changes')
+  .action(async (file: string, options: any) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    let content = '';
+    if (options.branch) {
+      // Review git branch
+      const git = simpleGit(process.cwd());
+      const diff = await git.diff([options.branch]);
+      content = diff;
+    } else {
+      content = await fs.promises.readFile(file, 'utf-8');
+    }
+
+    const spinner = ora('Reviewing code...').start();
+    try {
+      const response = await cli.chat(`Please review this code thoroughly:\n\`\`\`\n${content}\n\`\`\`\n\nProvide detailed feedback on: code quality, potential bugs, best practices, performance, and suggestions for improvement.`, false);
+      spinner.stop();
+      console.log(chalk.cyan('\n📝 Code Review:'));
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log(response);
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log();
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error reviewing code'));
+      process.exit(1);
+    }
+  });
+
+// Security command
+program
+  .command('security')
+  .description('Security audit')
+  .argument('[targetPath]', 'File or directory to audit', '.')
+  .action(async (targetPath: string) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    const files = await glob('**/*.{js,ts,jsx,tsx,py,java,go,rs}', {
+      cwd: targetPath,
+      ignore: ['node_modules/**', 'dist/**', '.git/**'],
+      nodir: true
+    });
+
+    const spinner = ora(`Auditing ${files.length} files...`).start();
+    const contents = await Promise.all(
+      files.slice(0, 10).map(async (f) => ({
+        path: f,
+        content: await fs.promises.readFile(path.join(targetPath, f), 'utf-8').catch(() => '')
+      }))
+    );
+
+    try {
+      const filesText = contents.map(c => `File: ${c.path}\n\`\`\`\n${c.content}\n\`\`\``).join('\n\n');
+      const response = await cli.chat(`Perform a security audit on these files:\n\n${filesText}\n\nCheck for: vulnerabilities, security best practices, injection attacks, authentication issues, data leaks, and other security concerns.`, false);
+      spinner.stop();
+      console.log(chalk.cyan('\n🔒 Security Audit:'));
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log(response);
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log();
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error performing security audit'));
+      process.exit(1);
+    }
+  });
+
+// Analyze command
+program
+  .command('analyze')
+  .description('Analyze code')
+  .argument('[targetPath]', 'File or directory to analyze', '.')
+  .option('--performance', 'Performance analysis')
+  .action(async (targetPath: string, options: any) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    const files = await glob('**/*.{js,ts,jsx,tsx}', {
+      cwd: targetPath,
+      ignore: ['node_modules/**', 'dist/**', '.git/**'],
+      nodir: true
+    });
+
+    const spinner = ora(`Analyzing ${files.length} files...`).start();
+    const contents = await Promise.all(
+      files.slice(0, 10).map(async (f) => ({
+        path: f,
+        content: await fs.promises.readFile(path.join(targetPath, f), 'utf-8').catch(() => '')
+      }))
+    );
+
+    try {
+      const filesText = contents.map(c => `File: ${c.path}\n\`\`\`\n${c.content}\n\`\`\``).join('\n\n');
+      const analysisType = options.performance ? 'performance' : 'general code structure';
+      const response = await cli.chat(`Analyze these files for ${analysisType}:\n\n${filesText}\n\nProvide detailed analysis with recommendations.`, false);
+      spinner.stop();
+      console.log(chalk.cyan('\n📊 Analysis:'));
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log(response);
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log();
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error analyzing code'));
+      process.exit(1);
+    }
+  });
+
+// Debug command
+program
+  .command('debug')
+  .description('Debug code')
+  .argument('<error>', 'Error message or description')
+  .option('-f, --file <path>', 'File to debug')
+  .action(async (error: string, options: any) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    let fileContent = '';
+    if (options.file) {
+      fileContent = await fs.promises.readFile(options.file, 'utf-8');
+    }
+
+    const spinner = ora('Debugging...').start();
+    try {
+      const prompt = fileContent 
+        ? `File:\n\`\`\`\n${fileContent}\n\`\`\`\n\nError: ${error}\n\nDebug this error and provide a fix.`
+        : `Debug this error: ${error}\n\nProvide a solution.`;
+      
+      const response = await cli.chat(prompt, false);
+      spinner.stop();
+      console.log(chalk.cyan('\n🐛 Debug Analysis:'));
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log(response);
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log();
+    } catch (err) {
+      spinner.stop();
+      console.error(chalk.red('Error debugging'));
+      process.exit(1);
+    }
+  });
+
+// Test command
+program
+  .command('test')
+  .description('Generate tests')
+  .argument('<file>', 'File to test')
+  .option('--framework <framework>', 'Test framework (jest, mocha, etc.)')
+  .action(async (file: string, options: any) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    const content = await fs.promises.readFile(file, 'utf-8');
+    const framework = options.framework || 'jest';
+
+    const spinner = ora('Generating tests...').start();
+    try {
+      const response = await cli.chat(`Generate comprehensive ${framework} tests for this code:\n\`\`\`\n${content}\n\`\`\`\n\nProvide complete test suite.`, false);
+      spinner.stop();
+
+      const codeMatch = response.match(/```[\s\S]*?\n([\s\S]*?)```/);
+      const testCode = codeMatch ? codeMatch[1].trim() : response;
+
+      const testFile = file.replace(/\.[^.]+$/, `.test.${file.split('.').pop()}`);
+      await fs.promises.writeFile(testFile, testCode, 'utf-8');
+      console.log(chalk.green(`✓ Tests generated: ${testFile}`));
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error generating tests'));
+      process.exit(1);
+    }
+  });
+
+// Fix-tests command
+program
+  .command('fix-tests')
+  .description('Fix failing tests')
+  .argument('<testfile>', 'Test file to fix')
+  .action(async (testfile: string) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    const testContent = await fs.promises.readFile(testfile, 'utf-8');
+
+    const spinner = ora('Fixing tests...').start();
+    try {
+      const response = await cli.chat(`Fix the failing tests in this file:\n\`\`\`\n${testContent}\n\`\`\`\n\nProvide the corrected test code.`, false);
+      spinner.stop();
+
+      const codeMatch = response.match(/```[\s\S]*?\n([\s\S]*?)```/);
+      const fixedCode = codeMatch ? codeMatch[1].trim() : response;
+
+      await fs.promises.writeFile(testfile, fixedCode, 'utf-8');
+      console.log(chalk.green(`✓ Tests fixed: ${testfile}`));
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error fixing tests'));
+      process.exit(1);
+    }
+  });
+
+// Docs command
+program
+  .command('docs')
+  .description('Generate documentation')
+  .argument('<file>', 'File to document')
+  .action(async (file: string) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    const content = await fs.promises.readFile(file, 'utf-8');
+
+    const spinner = ora('Generating documentation...').start();
+    try {
+      const response = await cli.chat(`Generate comprehensive documentation for this code:\n\`\`\`\n${content}\n\`\`\`\n\nInclude: purpose, usage examples, API reference, parameters, return values.`, false);
+      spinner.stop();
+
+      const docFile = file.replace(/\.[^.]+$/, '.md');
+      await fs.promises.writeFile(docFile, response, 'utf-8');
+      console.log(chalk.green(`✓ Documentation generated: ${docFile}`));
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error generating documentation'));
+      process.exit(1);
+    }
+  });
+
+// Readme command
+program
+  .command('readme')
+  .description('Generate README')
+  .option('--project <path>', 'Project directory', '.')
+  .action(async (options: any) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    const packageJsonPath = path.join(options.project, 'package.json');
+    let projectInfo = '';
+    try {
+      const pkg = await fs.promises.readFile(packageJsonPath, 'utf-8');
+      projectInfo = `Package.json:\n\`\`\`json\n${pkg}\n\`\`\`\n\n`;
+    } catch {
+      // No package.json
+    }
+
+    const spinner = ora('Generating README...').start();
+    try {
+      const response = await cli.chat(`${projectInfo}Generate a comprehensive README.md for this project. Include: description, installation, usage, features, examples, and contribution guidelines.`, false);
+      spinner.stop();
+
+      await fs.promises.writeFile(path.join(options.project, 'README.md'), response, 'utf-8');
+      console.log(chalk.green(`✓ README generated: README.md`));
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error generating README'));
+      process.exit(1);
+    }
+  });
+
+// Comment command
+program
+  .command('comment')
+  .description('Add inline comments')
+  .argument('<file>', 'File to comment')
+  .action(async (file: string) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    const content = await fs.promises.readFile(file, 'utf-8');
+
+    const spinner = ora('Adding comments...').start();
+    try {
+      const response = await cli.chat(`Add comprehensive inline comments to this code:\n\`\`\`\n${content}\n\`\`\`\n\nExplain complex logic, document functions, and clarify intent.`, false);
+      spinner.stop();
+
+      const codeMatch = response.match(/```[\s\S]*?\n([\s\S]*?)```/);
+      const commentedCode = codeMatch ? codeMatch[1].trim() : response;
+
+      await fs.promises.writeFile(file, commentedCode, 'utf-8');
+      console.log(chalk.green(`✓ Comments added to: ${file}`));
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error adding comments'));
+      process.exit(1);
+    }
+  });
+
+// Context commands
+program
+  .command('context')
+  .description('Manage context')
+  .argument('<action>', 'Action: add, list, clear, save, load')
+  .argument('[value]', 'Value for action')
+  .action(async (action: string, value: string) => {
+    const contextManager = new ContextManager();
+
+    switch (action) {
+      case 'add':
+        if (!value) {
+          console.error(chalk.red('Usage: ai-code context add <pattern>'));
+          process.exit(1);
+        }
+        await contextManager.add(value);
+        break;
+
+      case 'list':
+        await contextManager.list();
+        break;
+
+      case 'clear':
+        await contextManager.clear();
+        break;
+
+      case 'save':
+        if (!value) {
+          console.error(chalk.red('Usage: ai-code context save <session-name>'));
+          process.exit(1);
+        }
+        await contextManager.saveSession(value);
+        break;
+
+      case 'load':
+        if (!value) {
+          console.error(chalk.red('Usage: ai-code context load <session-name>'));
+          process.exit(1);
+        }
+        await contextManager.loadSession(value);
+        break;
+
+      default:
+        console.error(chalk.red(`Unknown action: ${action}`));
+        console.log(chalk.gray('Available actions: add, list, clear, save, load'));
+        process.exit(1);
+    }
+  });
+
+// Commit command
+program
+  .command('commit')
+  .description('Generate commit message')
+  .action(async () => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+    const git = simpleGit(process.cwd());
+
+    const spinner = ora('Analyzing changes...').start();
+    try {
+      const diff = await git.diff(['--staged']);
+      const status = await git.status();
+
+      if (status.staged.length === 0) {
+        spinner.stop();
+        console.log(chalk.yellow('No staged changes'));
+        return;
+      }
+
+      const response = await cli.chat(`Analyze these git changes and generate a clear, concise commit message:\n\`\`\`\n${diff}\n\`\`\`\n\nFollow conventional commit format.`, false);
+      spinner.stop();
+
+      console.log(chalk.cyan('\n📝 Suggested Commit Message:'));
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log(response);
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log();
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error generating commit message'));
+      process.exit(1);
+    }
+  });
+
+// PR description command
+program
+  .command('pr-description')
+  .description('Generate PR description')
+  .action(async () => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+    const git = simpleGit(process.cwd());
+
+    const spinner = ora('Analyzing branch...').start();
+    try {
+      const branches = await git.branch();
+      const diff = await git.diff(['main...HEAD']);
+
+      const response = await cli.chat(`Analyze these changes and generate a PR description:\n\`\`\`\n${diff}\n\`\`\`\n\nInclude: summary, changes made, testing notes.`, false);
+      spinner.stop();
+
+      console.log(chalk.cyan('\n📋 PR Description:'));
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log(response);
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log();
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error generating PR description'));
+      process.exit(1);
+    }
+  });
+
+// Diff command
+program
+  .command('diff')
+  .description('Compare files or git changes')
+  .argument('[file1]', 'First file or --staged')
+  .argument('[file2]', 'Second file')
+  .argument('[prompt]', 'What to explain about the diff')
+  .action(async (file1: string, file2: string, prompt: string) => {
+    const cli = new AICodeCLI({});
+    await cli.initialize();
+
+    let diffText = '';
+    if (file1 === '--staged') {
+      const git = simpleGit(process.cwd());
+      diffText = await git.diff(['--staged']);
+    } else if (file1 && file2) {
+      const content1 = await fs.promises.readFile(file1, 'utf-8');
+      const content2 = await fs.promises.readFile(file2, 'utf-8');
+      diffText = Diff.createPatch(file1, content1, content2);
+    } else {
+      console.error(chalk.red('Usage: ai-code diff <file1> <file2> [prompt] or ai-code diff --staged [prompt]'));
+      process.exit(1);
+    }
+
+    const spinner = ora('Analyzing diff...').start();
+    try {
+      const question = prompt || 'Explain the differences';
+      const response = await cli.chat(`Analyze this diff:\n\`\`\`\n${diffText}\n\`\`\`\n\n${question}.`, false);
+      spinner.stop();
+
+      console.log(chalk.cyan('\n📊 Diff Analysis:'));
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log(response);
+      console.log(chalk.gray('─'.repeat(70)));
+      console.log();
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('Error analyzing diff'));
+      process.exit(1);
+    }
+  });
+
+// Chat command (interactive session)
+program
+  .command('chat')
+  .description('Start interactive chat session')
+  .option('start', 'Start session (default)', true)
+  .action(async () => {
+    const cli = new AICodeCLI({});
+    await cli.repl();
   });
 
 program.parse();
