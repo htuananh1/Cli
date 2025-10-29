@@ -6,6 +6,7 @@ A simple, powerful command-line interface for interacting with AI models through
 
 ## ✨ Features
 
+### Core AI Features
 - 🚀 **Simple & Fast**: Just type and chat, no complex commands
 - 💬 **Interactive REPL**: Gemini-CLI inspired conversational interface
 - ♾️ **Unlimited Context**: No token limits - let the API handle it
@@ -13,6 +14,16 @@ A simple, powerful command-line interface for interacting with AI models through
 - 🎨 **Beautiful Output**: Colored, streaming responses
 - 🔄 **Conversation Memory**: History maintained in session
 - 🎯 **Multiple Models**: DeepSeek, GPT-4, Claude, Gemini, and more
+
+### 🆕 Enhanced System Features
+- 🔧 **Shell Execution**: Run any shell command with full system access
+- 📝 **Interactive File Editor**: Built-in editor with syntax highlighting
+- 🗂️ **Directory Navigation**: Browse and explore file systems
+- 🔍 **File Search**: Find files using glob patterns
+- 📊 **Command History**: Track and reuse previous commands
+- 🎨 **Multiple Themes**: Default, Dark, Light, and Rainbow themes
+- ⚡ **Progress Indicators**: Visual feedback for long operations
+- 🎭 **Animations**: Beautiful welcome screens and transitions
 
 ## 🚀 Quick Start
 
@@ -111,6 +122,7 @@ Assistant> [streaming response...]
 
 ### Interactive Commands
 
+#### AI Commands
 | Command | Description | Example |
 |---------|-------------|---------|
 | `/clear` | Clear conversation history | `/clear` |
@@ -120,6 +132,32 @@ Assistant> [streaming response...]
 | `/temp` | Change temperature (0.0-2.0) | `/temp 0.9` |
 | `/exit` | Exit interactive mode | `/exit` |
 | `/help` | Show help message | `/help` |
+
+#### 🆕 File Operations
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/read` | View file with syntax highlighting | `/read src/cli.ts 1 20` |
+| `/edit` | Interactive file editor | `/edit config.json` |
+| `/write` | Create or overwrite file | `/write test.js "console.log('hello')"` |
+| `/append` | Append text to file | `/append log.txt "New entry"` |
+| `/delete` | Delete file or directory | `/delete old-file.txt` |
+
+#### 🆕 Shell & Navigation
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/shell` | Run shell command | `/shell ls -la` |
+| `/interactive` | Run interactive command | `/interactive vim file.txt` |
+| `/ls` | List directory contents | `/ls src/` |
+| `/cd` | Change directory | `/cd ../src` |
+| `/pwd` | Show current directory | `/pwd` |
+| `/find` | Search for files | `/find "*.js"` |
+
+#### 🆕 System & UI
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/history` | Show command history | `/history` |
+| `/config` | Show configuration | `/config` |
+| `/theme` | Change UI theme | `/theme rainbow` |
 
 ## 📖 Usage Examples
 

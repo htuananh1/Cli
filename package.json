@@ -24,19 +24,33 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "openai": "^4.0.0",
-    "commander": "^11.0.0",
+    "boxen": "^7.0.0",
     "chalk": "^4.1.2",
-    "ora": "^5.4.1",
+    "chalk-animation": "^1.6.0",
+    "cli-progress": "^3.12.0",
+    "commander": "^11.0.0",
     "dotenv": "^16.0.0",
-    "tiktoken": "^1.0.0",
-    "fs-extra": "^11.0.0"
+    "figlet": "^1.6.0",
+    "fs-extra": "^11.0.0",
+    "glob": "^10.3.0",
+    "gradient-string": "^2.0.0",
+    "inquirer": "^9.2.0",
+    "mime-types": "^2.1.35",
+    "node-emoji": "^1.11.0",
+    "openai": "^4.0.0",
+    "ora": "^5.4.1",
+    "tiktoken": "^1.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/cli-progress": "^3.11.6",
+    "@types/figlet": "^1.5.0",
     "@types/fs-extra": "^11.0.0",
-    "typescript": "^5.0.0",
-    "ts-node": "^10.9.0"
+    "@types/inquirer": "^9.0.0",
+    "@types/mime-types": "^2.1.0",
+    "@types/node": "^20.0.0",
+    "@types/node-emoji": "^1.8.2",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=16.0.0"
