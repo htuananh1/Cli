@@ -1,1 +1,416 @@
-# Cli
+# AI Gateway CLI v2.1
+
+> **Talk to AI models with unlimited context** - Inspired by [gemini-cli](https://github.com/google-gemini/gemini-cli)
+
+A simple, powerful command-line interface for interacting with AI models through AI Gateway. Built with TypeScript and designed for natural conversations without token limits.
+
+## ✨ Features
+
+- 🚀 **Simple & Fast**: Just type and chat, no complex commands
+- 💬 **Interactive REPL**: Gemini-CLI inspired conversational interface
+- ♾️ **Unlimited Context**: No token limits - let the API handle it
+- 📁 **File Support**: Chat about code and documents
+- 🎨 **Beautiful Output**: Colored, streaming responses
+- 🔄 **Conversation Memory**: History maintained in session
+- 🎯 **Multiple Models**: DeepSeek, GPT-4, Claude, Gemini, and more
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Link globally (optional)
+npm link
+```
+
+### Setup API Key
+
+```bash
+export AI_GATEWAY_API_KEY="your-api-key-here"
+```
+
+### Basic Usage
+
+```bash
+# Interactive mode (default)
+ai-gateway
+
+# One-shot question
+ai-gateway "Why is the sky blue?"
+
+# With specific model
+ai-gateway "Explain quantum computing" --model openai/gpt-4
+
+# With file
+ai-gateway "Review this code" --file ./src/app.ts
+
+# With system prompt
+ai-gateway --system "You are a helpful coding assistant"
+```
+
+## 💬 Interactive Mode
+
+Just run `ai-gateway` to start chatting:
+
+```
+╔════════════════════════════════════════════════════════════╗
+║            AI Gateway CLI - Interactive Mode                ║
+╚════════════════════════════════════════════════════════════╝
+
+Model: deepseek/deepseek-v3.2-exp
+Temperature: 0.7
+
+Commands:
+  /clear     - Clear conversation history
+  /stats     - Show conversation statistics
+  /file      - Chat with file content
+  /model     - Change model
+  /temp      - Change temperature
+  /exit      - Exit (or Ctrl+C)
+  /help      - Show this help
+
+Just type your message and press Enter to chat!
+────────────────────────────────────────────────────────────
+
+You> Hello! How are you?
+
+Assistant> [streaming response...]
+```
+
+### Interactive Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/clear` | Clear conversation history | `/clear` |
+| `/stats` | Show conversation statistics | `/stats` |
+| `/file` | Chat with file content | `/file ./code.ts Review this` |
+| `/model` | Change or view current model | `/model openai/gpt-4` |
+| `/temp` | Change temperature (0.0-2.0) | `/temp 0.9` |
+| `/exit` | Exit interactive mode | `/exit` |
+| `/help` | Show help message | `/help` |
+
+## 📖 Usage Examples
+
+### Quick Questions
+
+```bash
+# Simple question
+ai-gateway "What is recursion?"
+
+# With specific temperature
+ai-gateway "Write a poem" --temperature 1.2
+
+# JSON formatting
+ai-gateway "List 5 colors in JSON format"
+```
+
+### Code Review
+
+```bash
+# Review a file
+ai-gateway "Review this code for bugs" --file ./auth.ts
+
+# Interactive code review
+ai-gateway --system "You are a senior code reviewer"
+You> Let's review my authentication system
+You> /file ./auth.ts Analyze security
+You> /file ./db.ts Check database queries
+```
+
+### Learning Sessions
+
+```bash
+# Start learning session
+ai-gateway --system "You are a patient tutor" --model anthropic/claude-3-opus
+
+You> Explain distributed systems
+Assistant> [detailed explanation...]
+
+You> Can you give examples?
+Assistant> [examples with context from previous answer...]
+
+You> How does this relate to microservices?
+Assistant> [connects to earlier discussion...]
+```
+
+### Creative Writing
+
+```bash
+ai-gateway --temperature 1.0 --system "You are a creative writing partner"
+
+You> Let's write a sci-fi story about AI
+Assistant> [creative ideas...]
+
+You> I like idea #2, develop it more
+Assistant> [builds on previous ideas...]
+```
+
+### File Analysis
+
+```bash
+# Analyze code
+ai-gateway "Explain this code" --file ./complex-algo.ts
+
+# Compare files in interactive mode
+ai-gateway
+You> /file ./v1.ts Analyze this version
+You> /file ./v2.ts Compare with previous version
+```
+
+## 🎯 Available Models
+
+| Model | Provider | Best For |
+|-------|----------|----------|
+| `deepseek/deepseek-v3.2-exp` | DeepSeek | Code, reasoning (default) |
+| `openai/gpt-4-turbo` | OpenAI | Long context, complex tasks |
+| `openai/gpt-4` | OpenAI | High quality responses |
+| `openai/gpt-3.5-turbo` | OpenAI | Fast, simple tasks |
+| `anthropic/claude-3-opus` | Anthropic | Long documents, analysis |
+| `anthropic/claude-3-sonnet` | Anthropic | Balanced performance |
+| `anthropic/claude-3-haiku` | Anthropic | Fast, simple tasks |
+| `google/gemini-pro` | Google | Multimodal tasks |
+
+View all models:
+```bash
+ai-gateway --help
+```
+
+## 🔧 CLI Options
+
+```bash
+ai-gateway [message] [options]
+
+Options:
+  -m, --model <model>         Model to use (default: deepseek/deepseek-v3.2-exp)
+  -t, --temperature <number>  Temperature 0.0-2.0 (default: 0.7)
+  -s, --system <prompt>       System prompt
+  -f, --file <path>           Include file content
+  --api-key <key>             API key (overrides env var)
+  --base-url <url>            API base URL
+  -h, --help                  Show help
+  -V, --version               Show version
+```
+
+## 🌟 Why This CLI?
+
+### Inspired by gemini-cli
+
+This CLI takes inspiration from Google's excellent [gemini-cli](https://github.com/google-gemini/gemini-cli):
+
+- **Simple UX**: No complex commands, just chat naturally
+- **REPL-first**: Interactive mode as the primary interface
+- **Slash commands**: Intuitive `/command` syntax
+- **File support**: Easy file inclusion
+- **Stream by default**: See responses as they're generated
+
+### Key Differences
+
+- ♾️ **No Token Limits**: We don't artificially limit context
+- 🎯 **Multiple Models**: Not just one provider
+- 🔄 **In-memory History**: Simple session-based memory
+- 📝 **Simpler**: Focused on core chat experience
+
+## 📚 Examples
+
+### Multi-turn Conversation
+
+```bash
+ai-gateway
+
+You> I'm building a REST API in Node.js
+Assistant> Great! What kind of API are you building?
+
+You> A todo app backend
+Assistant> [suggestions for todo API...]
+
+You> Show me code for the user authentication
+Assistant> [provides code with context of todo app...]
+
+You> /stats
+📊 Conversation Stats:
+   Messages: 6
+   User: 3 | Assistant: 3
+   Model: deepseek/deepseek-v3.2-exp
+```
+
+### Debug Session
+
+```bash
+ai-gateway --system "You are a debugging expert"
+
+You> /file ./app.ts My app crashes on startup
+Assistant> [analyzes code...]
+
+You> Here's the error log: [paste error]
+Assistant> [diagnoses with code context...]
+
+You> /temp 0.3  # Lower temperature for precise fixes
+✓ Temperature set to: 0.3
+
+You> What's the fix?
+Assistant> [provides specific solution...]
+```
+
+### Brainstorming
+
+```bash
+ai-gateway -t 1.2 --system "Creative brainstorming partner"
+
+You> App idea: AI-powered task manager
+Assistant> [creative ideas...]
+
+You> Expand on idea #3
+Assistant> [detailed expansion...]
+
+You> Now list technical requirements
+Assistant> [concrete requirements based on brainstorm...]
+```
+
+## 💡 Tips & Tricks
+
+### 1. Use System Prompts
+
+```bash
+ai-gateway --system "You are a Python expert. Always show code examples."
+```
+
+### 2. Adjust Temperature
+
+- **0.0-0.3**: Precise, deterministic (code, facts)
+- **0.4-0.7**: Balanced (default)
+- **0.8-1.5**: Creative (writing, brainstorming)
+- **1.6-2.0**: Very creative (experimental)
+
+### 3. Change Models Mid-conversation
+
+```bash
+You> Explain this concept simply
+Assistant> [explains...]
+
+You> /model openai/gpt-4
+✓ Model changed to: openai/gpt-4
+
+You> Now give me the advanced details
+Assistant> [detailed explanation with new model...]
+```
+
+### 4. File Reviews
+
+```bash
+# In interactive mode
+You> /file ./package.json Review dependencies
+You> /file ./tsconfig.json Check TypeScript config
+You> Are there any conflicts between these configs?
+```
+
+### 5. Keyboard Shortcuts
+
+- `Ctrl+C`: Exit interactive mode
+- `Ctrl+D`: Exit interactive mode (Unix)
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+ai-gateway-cli/
+├── src/
+│   └── cli.ts           # Main CLI (simplified)
+├── dist/                # Compiled output
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+### Build & Run
+
+```bash
+# Development
+npm run dev -- "Hello world"
+
+# Build
+npm run build
+
+# Run
+node dist/cli.js
+
+# Or after npm link
+ai-gateway
+```
+
+## 🔒 Security
+
+- API keys stored in environment variables
+- File content read safely
+- No data persisted to disk (session only)
+
+## 🐛 Troubleshooting
+
+### "API key not set"
+
+```bash
+export AI_GATEWAY_API_KEY="your-key"
+# Or
+ai-gateway --api-key "your-key"
+```
+
+### "Model not found"
+
+Check available models:
+```bash
+ai-gateway --help
+```
+
+### Streaming not working
+
+Some terminals may not support streaming. The CLI will fall back gracefully.
+
+## 📝 License
+
+MIT
+
+## 🙏 Credits
+
+Inspired by:
+- [gemini-cli](https://github.com/google-gemini/gemini-cli) - Google's Gemini CLI
+- [AI Gateway](https://ai-gateway.vercel.sh) - Multi-provider AI gateway
+
+---
+
+**Happy chatting! 🤖💬**
+
+## Quick Reference
+
+```bash
+# Start interactive mode
+ai-gateway
+
+# Quick question  
+ai-gateway "your question"
+
+# With file
+ai-gateway "review this" --file code.ts
+
+# Change model
+ai-gateway --model openai/gpt-4
+
+# Creative mode
+ai-gateway --temperature 1.2
+
+# Custom system prompt
+ai-gateway --system "You are a helpful assistant"
+
+# In interactive mode:
+/clear    # Clear history
+/stats    # Show stats
+/file     # Include file
+/model    # Change model
+/temp     # Change temperature
+/exit     # Quit
+```

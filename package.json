@@ -1,0 +1,44 @@
+{
+  "name": "ai-gateway-cli",
+  "version": "2.1.0",
+  "description": "AI Gateway CLI - Talk to AI models with unlimited context (inspired by gemini-cli)",
+  "main": "dist/cli.js",
+  "bin": {
+    "ai-gateway": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "gateway",
+    "cli",
+    "openai",
+    "deepseek",
+    "claude",
+    "gpt"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "openai": "^4.0.0",
+    "commander": "^11.0.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "dotenv": "^16.0.0",
+    "tiktoken": "^1.0.0",
+    "fs-extra": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/fs-extra": "^11.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
