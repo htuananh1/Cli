@@ -3,10 +3,13 @@
 import { Command } from 'commander';
 import OpenAI from 'openai';
 import chalk from 'chalk';
+import ora from 'ora';
 import * as readline from 'readline';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 dotenv.config();
 
@@ -27,6 +30,7 @@ class GeminiStyleCLI {
   private client: OpenAI;
   private config: Config;
   private conversationHistory: Message[] = [];
+  private execAsync = promisify(exec);
 
   constructor(config: Config) {
     this.config = config;
@@ -135,34 +139,180 @@ class GeminiStyleCLI {
     const messageCount = this.conversationHistory.filter(m => m.role !== 'system').length;
     const userMessages = this.conversationHistory.filter(m => m.role === 'user').length;
     const assistantMessages = this.conversationHistory.filter(m => m.role === 'assistant').length;
-    
-    console.log(chalk.cyan('\n📊 Conversation Stats:'));
-    console.log(chalk.gray(`   Messages: ${messageCount}`));
-    console.log(chalk.gray(`   User: ${userMessages} | Assistant: ${assistantMessages}`));
-    console.log(chalk.gray(`   Model: ${this.config.model}`));
+
+    this.printPanel('Conversation Stats', [
+      `Messages: ${messageCount}`,
+      `User: ${userMessages} | Assistant: ${assistantMessages}`,
+      `Model: ${this.config.model}`,
+    ]);
+  }
+
+  private stripAnsi(text: string): string {
+    return text.replace(/\u001b\[[0-9;?]*[ -\/]*[@-~]/g, '');
+  }
+
+  private parseArgs(line: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let quote: string | null = null;
+    let escape = false;
+
+    const pushCurrent = () => {
+      if (current.length > 0) {
+        args.push(current);
+        current = '';
+      }
+    };
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (escape) {
+        current += char;
+        escape = false;
+        continue;
+      }
+
+      if (char === '\\' && quote) {
+        escape = true;
+        continue;
+      }
+
+      if (quote) {
+        if (char === quote) {
+          quote = null;
+          continue;
+        }
+
+        current += char;
+        continue;
+      }
+
+      if (char === '"' || char === '\'' || char === '`') {
+        if (current.length > 0) {
+          pushCurrent();
+        }
+        quote = char;
+        continue;
+      }
+
+      if (/\s/.test(char)) {
+        pushCurrent();
+        continue;
+      }
+
+      current += char;
+    }
+
+    if (current.length > 0) {
+      pushCurrent();
+    }
+
+    return args;
+  }
+
+  private printPanel(title: string, body: string | string[], color: chalk.Chalk = chalk.cyan): void {
+    const lines = Array.isArray(body) ? body : body.split('\n');
+    const contentWidth = Math.max(
+      ...lines.map(line => this.stripAnsi(line).length),
+      this.stripAnsi(title).length,
+    );
+    const horizontal = '═'.repeat(contentWidth + 4);
+    console.log(color(`\n╔${horizontal}╗`));
+    const titleText = chalk.bold(title.padEnd(contentWidth, ' '));
+    console.log(color(`║  ${titleText}  ║`));
+    console.log(color(`╠${horizontal}╣`));
+    for (const line of lines) {
+      const strippedLength = this.stripAnsi(line).length;
+      const padding = ' '.repeat(contentWidth - strippedLength);
+      console.log(color(`║  ${line}${padding}  ║`));
+    }
+    console.log(color(`╚${horizontal}╝`));
     console.log();
   }
 
+  private async executeShellCommand(command: string): Promise<void> {
+    const spinner = ora({ text: chalk.gray(`Running: ${command}`), spinner: 'dots' }).start();
+    try {
+      const { stdout, stderr } = await this.execAsync(command, { maxBuffer: 10 * 1024 * 1024 });
+      spinner.stop();
+
+      if (stdout.trim()) {
+        this.printPanel('Shell Output', stdout.trim().split('\n'), chalk.green);
+      } else {
+        this.printPanel('Shell Output', ['(no output)'], chalk.green);
+      }
+
+      if (stderr.trim()) {
+        this.printPanel('Shell Errors', stderr.trim().split('\n'), chalk.red);
+      }
+    } catch (error: any) {
+      spinner.stop();
+      const message = error.stderr || error.message || 'Unknown error';
+      this.printPanel('Shell Error', message.toString().trim().split('\n'), chalk.red);
+    }
+  }
+
+  private async displayFileContent(filePath: string): Promise<void> {
+    const spinner = ora({ text: chalk.gray(`Reading ${filePath}`), spinner: 'dots' }).start();
+    try {
+      const absolute = path.resolve(filePath);
+      const stats = await fs.promises.stat(absolute);
+      if (!stats.isFile()) {
+        throw new Error('The specified path is not a file');
+      }
+
+      const content = await fs.promises.readFile(absolute, 'utf-8');
+      spinner.stop();
+      const lines = content.split('\n').map((line, index) => {
+        const lineNumber = chalk.gray(`${index + 1}`.padStart(4, ' '));
+        return `${lineNumber} ${line}`;
+      });
+      this.printPanel(`File: ${path.relative(process.cwd(), absolute)}`, lines.length ? lines : ['(empty file)']);
+    } catch (error: any) {
+      spinner.stop();
+      this.printPanel('File Read Error', error.message.split('\n'), chalk.red);
+    }
+  }
+
+  private async writeFileContent(filePath: string, content: string, append: boolean = false): Promise<void> {
+    const absolute = path.resolve(filePath);
+    const action = append ? 'Appending to' : 'Writing to';
+    const spinner = ora({ text: chalk.gray(`${action} ${absolute}`), spinner: 'dots' }).start();
+    try {
+      await fs.promises.mkdir(path.dirname(absolute), { recursive: true });
+      if (append) {
+        await fs.promises.appendFile(absolute, content);
+      } else {
+        await fs.promises.writeFile(absolute, content);
+      }
+      spinner.stop();
+      this.printPanel('File Saved', [`${append ? 'Appended' : 'Wrote'} ${content.length} characters`, `Path: ${path.relative(process.cwd(), absolute)}`], chalk.green);
+    } catch (error: any) {
+      spinner.stop();
+      this.printPanel('File Write Error', error.message.split('\n'), chalk.red);
+    }
+  }
+
   async repl(): Promise<void> {
-    console.log(chalk.green('╔════════════════════════════════════════════════════════════╗'));
-    console.log(chalk.green('║            AI Gateway CLI - Interactive Mode                ║'));
-    console.log(chalk.green('╚════════════════════════════════════════════════════════════╝'));
-    console.log();
-    console.log(chalk.cyan(`Model: ${this.config.model}`));
-    console.log(chalk.gray(`Temperature: ${this.config.temperature}`));
-    console.log();
-    console.log(chalk.yellow('Commands:'));
-    console.log(chalk.gray('  /clear     - Clear conversation history'));
-    console.log(chalk.gray('  /stats     - Show conversation statistics'));
-    console.log(chalk.gray('  /file      - Chat with file content'));
-    console.log(chalk.gray('  /model     - Change model'));
-    console.log(chalk.gray('  /temp      - Change temperature'));
-    console.log(chalk.gray('  /exit      - Exit (or Ctrl+C)'));
-    console.log(chalk.gray('  /help      - Show this help'));
-    console.log();
-    console.log(chalk.gray('Just type your message and press Enter to chat!'));
-    console.log(chalk.gray('─'.repeat(60)));
-    console.log();
+    this.printPanel('AI Gateway CLI - Interactive Mode', [
+      chalk.gray(`Model: ${this.config.model}`),
+      chalk.gray(`Temperature: ${this.config.temperature}`),
+    ], chalk.green);
+
+    this.printPanel('Commands', [
+      chalk.gray('/clear       Clear conversation history'),
+      chalk.gray('/stats       Show conversation statistics'),
+      chalk.gray('/file        Chat with file content'),
+      chalk.gray('/read        Preview a file with line numbers'),
+      chalk.gray('/write       Overwrite a file with new content'),
+      chalk.gray('/append      Append text to a file'),
+      chalk.gray('/shell       Run a shell command'),
+      chalk.gray('/model       Change model'),
+      chalk.gray('/temp        Change temperature'),
+      chalk.gray('/exit        Exit (or Ctrl+C)'),
+      chalk.gray('/help        Show this help'),
+    ]);
 
     const rl = readline.createInterface({
       input: process.stdin,
@@ -182,8 +332,14 @@ class GeminiStyleCLI {
 
       // Handle commands
       if (input.startsWith('/')) {
-        const [command, ...args] = input.slice(1).split(' ');
-        
+        const [command, ...args] = this.parseArgs(input.slice(1));
+
+        if (!command) {
+          console.log(chalk.red('Please provide a command after "/".'));
+          rl.prompt();
+          return;
+        }
+
         switch (command.toLowerCase()) {
           case 'exit':
           case 'quit':
@@ -202,15 +358,13 @@ class GeminiStyleCLI {
             break;
 
           case 'file':
-            const filePath = args.join(' ').trim();
-            if (!filePath) {
+            if (args.length === 0) {
               console.log(chalk.red('Usage: /file <path> <message>'));
               console.log(chalk.gray('Example: /file ./code.ts Review this code'));
             } else {
-              const parts = filePath.split(' ');
-              const file = parts[0];
-              const message = parts.slice(1).join(' ') || 'Analyze this file';
-              
+              const file = args[0];
+              const message = args.slice(1).join(' ') || 'Analyze this file';
+
               console.log(chalk.cyan('\nAssistant> '));
               try {
                 await this.chatWithFile(message, file);
@@ -220,6 +374,49 @@ class GeminiStyleCLI {
               console.log();
             }
             break;
+
+          case 'read': {
+            const target = args[0];
+            if (!target) {
+              console.log(chalk.red('Usage: /read <file>'));
+            } else {
+              await this.displayFileContent(target);
+            }
+            break;
+          }
+
+          case 'write': {
+            const [target, ...contentParts] = args;
+            if (!target || contentParts.length === 0) {
+              console.log(chalk.red('Usage: /write <file> <content>'));
+              console.log(chalk.gray('Tip: surround multi-word paths with quotes.'));
+            } else {
+              await this.writeFileContent(target, contentParts.join(' '), false);
+            }
+            break;
+          }
+
+          case 'append': {
+            const [target, ...contentParts] = args;
+            if (!target || contentParts.length === 0) {
+              console.log(chalk.red('Usage: /append <file> <content>'));
+              console.log(chalk.gray('Tip: surround multi-word paths with quotes.'));
+            } else {
+              await this.writeFileContent(target, `${contentParts.join(' ')}\n`, true);
+            }
+            break;
+          }
+
+          case 'shell': {
+            const command = args.join(' ').trim();
+            if (!command) {
+              console.log(chalk.red('Usage: /shell <command>'));
+              console.log(chalk.gray('Example: /shell ls -la'));
+            } else {
+              await this.executeShellCommand(command);
+            }
+            break;
+          }
 
           case 'model':
             const newModel = args.join(' ').trim();
@@ -263,14 +460,19 @@ class GeminiStyleCLI {
             break;
 
           case 'help':
-            console.log(chalk.yellow('\nCommands:'));
-            console.log(chalk.gray('  /clear     - Clear conversation history'));
-            console.log(chalk.gray('  /stats     - Show conversation statistics'));
-            console.log(chalk.gray('  /file      - Chat with file content'));
-            console.log(chalk.gray('  /model     - Change model'));
-            console.log(chalk.gray('  /temp      - Change temperature'));
-            console.log(chalk.gray('  /exit      - Exit'));
-            console.log(chalk.gray('  /help      - Show this help\n'));
+            this.printPanel('Commands', [
+              chalk.gray('/clear       Clear conversation history'),
+              chalk.gray('/stats       Show conversation statistics'),
+              chalk.gray('/file        Chat with file content'),
+              chalk.gray('/read        Preview a file with line numbers'),
+              chalk.gray('/write       Overwrite a file with new content'),
+              chalk.gray('/append      Append text to a file'),
+              chalk.gray('/shell       Run a shell command'),
+              chalk.gray('/model       Change model'),
+              chalk.gray('/temp        Change temperature'),
+              chalk.gray('/exit        Exit'),
+              chalk.gray('/help        Show this help'),
+            ]);
             break;
 
           default:
