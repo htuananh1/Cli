@@ -104,20 +104,29 @@ You> Are these consistent with each other?
 
 ### 5. Multiple Models
 
-Support for various AI providers:
+Support for various AI providers including the latest models:
 
 | Provider | Models | Best For |
 |----------|--------|----------|
 | **DeepSeek** | `deepseek/deepseek-v3.2-exp` | Code, reasoning, default |
-| **OpenAI** | `gpt-4-turbo`, `gpt-4`, `gpt-3.5-turbo` | General purpose, quality |
-| **Anthropic** | `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` | Long documents, analysis |
-| **Google** | `gemini-pro` | Multimodal tasks |
+| **OpenAI** | `gpt-5`, `gpt-5-codex`, `gpt-4-turbo`, `gpt-4`, `gpt-3.5-turbo` | General purpose, code generation |
+| **Anthropic** | `claude-sonnet-4.5`, `claude-haiku-4.5`, `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` | Long documents, advanced reasoning |
+| **Google** | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-pro` | Multimodal, fast processing |
+
+**Latest Models (New!):**
+- `anthropic/claude-sonnet-4.5` - Most advanced coding & reasoning
+- `anthropic/claude-haiku-4.5` - Fast, efficient tasks  
+- `openai/gpt-5` - Next-gen language understanding
+- `openai/gpt-5-codex` - Advanced code generation
+- `google/gemini-2.5-pro` - Multimodal, long context
+- `google/gemini-2.5-flash` - Fast, efficient processing
 
 **Features:**
 - Easy model switching with `/model`
 - Model displayed in interactive mode
 - All models use same interface
 - No configuration needed
+- Access to cutting-edge AI models
 
 ### 6. Temperature Control
 

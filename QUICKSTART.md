@@ -4,12 +4,28 @@
 
 ### 1. Install
 
+**Option A: From Source (Recommended)**
 ```bash
 git clone <your-repo>
 cd ai-gateway-cli
 npm install
 npm run build
 npm link
+```
+
+**Option B: Direct Run**
+```bash
+git clone <your-repo>
+cd ai-gateway-cli
+npm install
+npm run build
+node dist/cli.js
+```
+
+**Option C: Development Mode**
+```bash
+npm install
+npx ts-node src/cli.ts
 ```
 
 ### 2. Set API Key
@@ -114,8 +130,25 @@ ai-gateway --system "You are a senior developer doing code review"
 You> Simple explanation please
 Assistant> [explains...]
 
-You> /model anthropic/claude-3-opus
+You> /model anthropic/claude-sonnet-4.5
 You> Now the advanced version
+
+You> /model
+Current model: anthropic/claude-sonnet-4.5
+
+Available models:
+  DeepSeek:
+    - deepseek/deepseek-v3.2-exp
+  OpenAI:
+    - openai/gpt-5
+    - openai/gpt-5-codex
+    - openai/gpt-4-turbo
+  Anthropic:
+    - anthropic/claude-sonnet-4.5
+    - anthropic/claude-haiku-4.5
+  Google:
+    - google/gemini-2.5-pro
+    - google/gemini-2.5-flash
 ```
 
 ### 4. Multiple Files
@@ -146,10 +179,19 @@ You> /file ./types.ts Review my types
 ### Learning
 
 ```bash
-ai-gateway --model anthropic/claude-3-opus
+ai-gateway --model anthropic/claude-sonnet-4.5
 You> Teach me about Docker
 You> What are containers?
 You> Show me a Dockerfile example
+```
+
+### Code Generation
+
+```bash
+ai-gateway --model openai/gpt-5-codex
+You> Create a REST API with authentication
+You> Add rate limiting
+You> Write tests for it
 ```
 
 ### Writing
@@ -180,10 +222,20 @@ Check the model name:
 ai-gateway --help  # See available options
 ```
 
-Common models:
-- `deepseek/deepseek-v3.2-exp` (default)
+**Latest Models:**
+- `anthropic/claude-sonnet-4.5` - Advanced coding & reasoning
+- `anthropic/claude-haiku-4.5` - Fast & efficient
+- `openai/gpt-5` - Next-gen understanding
+- `openai/gpt-5-codex` - Code generation
+- `google/gemini-2.5-pro` - Long context
+- `google/gemini-2.5-flash` - Fast processing
+- `deepseek/deepseek-v3.2-exp` - Default
+
+**Previous Generation:**
+- `openai/gpt-4-turbo`
 - `openai/gpt-4`
 - `anthropic/claude-3-opus`
+- `google/gemini-pro`
 
 ### Command Not Found
 

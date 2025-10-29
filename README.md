@@ -18,15 +18,41 @@ A simple, powerful command-line interface for interacting with AI models through
 
 ### Installation
 
+#### Option 1: Install from Source
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd ai-gateway-cli
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Link globally to use 'ai-gateway' command anywhere
+npm link
+```
+
+#### Option 2: Install via NPM (if published)
+
+```bash
+# Install globally
+npm install -g ai-gateway-cli
+
+# Or use npx without installation
+npx ai-gateway-cli
+```
+
+#### Option 3: Run with ts-node (Development)
+
 ```bash
 # Install dependencies
 npm install
 
-# Build
-npm run build
-
-# Link globally (optional)
-npm link
+# Run directly with ts-node
+npx ts-node src/cli.ts
 ```
 
 ### Setup API Key
@@ -165,9 +191,22 @@ You> /file ./v2.ts Compare with previous version
 
 ## 🎯 Available Models
 
+### Latest Models (Recommended)
+
 | Model | Provider | Best For |
 |-------|----------|----------|
+| `anthropic/claude-sonnet-4.5` | Anthropic | Most advanced coding & reasoning |
+| `anthropic/claude-haiku-4.5` | Anthropic | Fast, efficient tasks |
+| `openai/gpt-5` | OpenAI | Next-gen language understanding |
+| `openai/gpt-5-codex` | OpenAI | Advanced code generation |
+| `google/gemini-2.5-pro` | Google | Multimodal, long context |
+| `google/gemini-2.5-flash` | Google | Fast, efficient processing |
 | `deepseek/deepseek-v3.2-exp` | DeepSeek | Code, reasoning (default) |
+
+### Previous Generation Models
+
+| Model | Provider | Best For |
+|-------|----------|----------|
 | `openai/gpt-4-turbo` | OpenAI | Long context, complex tasks |
 | `openai/gpt-4` | OpenAI | High quality responses |
 | `openai/gpt-3.5-turbo` | OpenAI | Fast, simple tasks |
@@ -179,6 +218,25 @@ You> /file ./v2.ts Compare with previous version
 View all models:
 ```bash
 ai-gateway --help
+
+# Or in interactive mode
+You> /model
+```
+
+### Model Examples
+
+```bash
+# Use Claude Sonnet 4.5 for advanced coding
+ai-gateway --model anthropic/claude-sonnet-4.5 "Refactor this code to use async/await"
+
+# Use GPT-5 for complex reasoning
+ai-gateway --model openai/gpt-5 "Explain quantum entanglement simply"
+
+# Use Gemini 2.5 Flash for quick tasks
+ai-gateway --model google/gemini-2.5-flash "Summarize this article"
+
+# Use GPT-5 Codex for code generation
+ai-gateway --model openai/gpt-5-codex "Create a REST API with authentication"
 ```
 
 ## 🔧 CLI Options
@@ -385,6 +443,13 @@ Inspired by:
 
 **Happy chatting! 🤖💬**
 
+## 📋 System Requirements
+
+- **Node.js**: 16.0.0 or higher
+- **npm**: 7.0.0 or higher
+- **Operating System**: macOS, Linux, or Windows (with WSL recommended)
+- **API Key**: AI Gateway API key (set as `AI_GATEWAY_API_KEY` environment variable)
+
 ## Quick Reference
 
 ```bash
@@ -397,8 +462,10 @@ ai-gateway "your question"
 # With file
 ai-gateway "review this" --file code.ts
 
-# Change model
-ai-gateway --model openai/gpt-4
+# Use latest models
+ai-gateway --model anthropic/claude-sonnet-4.5 "your question"
+ai-gateway --model openai/gpt-5 "your question"
+ai-gateway --model google/gemini-2.5-pro "your question"
 
 # Creative mode
 ai-gateway --temperature 1.2
@@ -410,7 +477,38 @@ ai-gateway --system "You are a helpful assistant"
 /clear    # Clear history
 /stats    # Show stats
 /file     # Include file
-/model    # Change model
+/model    # Change model (shows all available models)
 /temp     # Change temperature
 /exit     # Quit
+```
+
+## 🔥 Pro Tips
+
+### Best Model for Each Task
+
+```bash
+# Code Generation & Debugging
+ai-gateway --model openai/gpt-5-codex
+
+# Complex Reasoning & Analysis  
+ai-gateway --model anthropic/claude-sonnet-4.5
+
+# Fast Prototyping
+ai-gateway --model google/gemini-2.5-flash
+
+# Long Context Processing
+ai-gateway --model google/gemini-2.5-pro
+
+# General Purpose (Best Balance)
+ai-gateway --model openai/gpt-5
+```
+
+### Environment Variables
+
+```bash
+# Required
+export AI_GATEWAY_API_KEY="your-api-key"
+
+# Optional
+export AI_GATEWAY_BASE_URL="https://ai-gateway.vercel.sh/v1"
 ```
