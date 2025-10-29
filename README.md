@@ -10,7 +10,8 @@ A simple, powerful command-line interface for interacting with AI models through
 - 💬 **Interactive REPL**: Gemini-CLI inspired conversational interface
 - ♾️ **Unlimited Context**: No token limits - let the API handle it
 - 📁 **File Support**: Chat about code and documents
-- 🎨 **Beautiful Output**: Colored, streaming responses
+- 🎨 **Gemini UI**: Conversation bubbles styled like gemini-cli
+- 🧭 **Context-Aware Prompt**: Built-in system prompt keeps replies grounded in history
 - 🔄 **Conversation Memory**: History maintained in session
 - 🎯 **Multiple Models**: DeepSeek, GPT-4, Claude, Gemini, and more
 
@@ -116,6 +117,11 @@ Assistant> [streaming response...]
 | `/clear` | Clear conversation history | `/clear` |
 | `/stats` | Show conversation statistics | `/stats` |
 | `/file` | Chat with file content | `/file ./code.ts Review this` |
+| `/read` | Preview a file with line numbers | `/read ./src/app.ts` |
+| `/write` | Overwrite a file with new content | `/write ./notes.txt "Hello"` |
+| `/append` | Append text to a file | `/append ./notes.txt "More"` |
+| `/shell` | Run a shell command | `/shell ls -la` |
+| `/prompt` | View or update the contextual system prompt | `/prompt You are a creative tutor` |
 | `/model` | Change or view current model | `/model openai/gpt-4` |
 | `/temp` | Change temperature (0.0-2.0) | `/temp 0.9` |
 | `/exit` | Exit interactive mode | `/exit` |

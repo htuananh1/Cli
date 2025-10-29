@@ -3,12 +3,17 @@
 import { Command } from 'commander';
 import OpenAI from 'openai';
 import chalk from 'chalk';
+import ora from 'ora';
 import * as readline from 'readline';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 dotenv.config();
+
+const DEFAULT_SYSTEM_PROMPT = `You are the AI Gateway CLI assistant. Maintain awareness of the full conversation history and respond with thoughtful, contextual answers. Reference earlier discussion when it is relevant, provide concise summaries of your reasoning, and format code or commands clearly. When the user speaks Vietnamese, reply in Vietnamese unless instructed otherwise.`;
 
 interface Config {
   apiKey: string;
@@ -27,10 +32,16 @@ class GeminiStyleCLI {
   private client: OpenAI;
   private config: Config;
   private conversationHistory: Message[] = [];
+  private execAsync = promisify(exec);
+  private readonly bubbleWidth = 72;
 
   constructor(config: Config) {
     this.config = config;
-    
+
+    if (!this.config.systemPrompt) {
+      this.config.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    }
+
     if (!config.apiKey) {
       console.error(chalk.red('Error: AI_GATEWAY_API_KEY environment variable not set'));
       console.error(chalk.gray('Set it with: export AI_GATEWAY_API_KEY="your-key"'));
@@ -42,21 +53,177 @@ class GeminiStyleCLI {
       baseURL: config.baseUrl,
     });
 
-    // Add system prompt if provided
-    if (config.systemPrompt) {
-      this.conversationHistory.push({
+    this.setSystemPrompt(this.config.systemPrompt);
+  }
+
+  private setSystemPrompt(prompt: string | undefined): void {
+    if (!prompt) {
+      return;
+    }
+
+    this.config.systemPrompt = prompt;
+
+    if (this.conversationHistory.length > 0 && this.conversationHistory[0].role === 'system') {
+      this.conversationHistory[0].content = prompt;
+    } else {
+      this.conversationHistory.unshift({
         role: 'system',
-        content: config.systemPrompt,
+        content: prompt,
       });
     }
   }
 
+  private wrapContent(text: string, width: number): string[] {
+    const result: string[] = [];
+    const paragraphs = text.split(/\r?\n/);
+
+    paragraphs.forEach((paragraph, index) => {
+      if (paragraph.trim() === '') {
+        if (result[result.length - 1] !== '') {
+          result.push('');
+        } else if (result.length === 0) {
+          result.push('');
+        }
+      } else {
+        let line = '';
+        const words = paragraph.split(/\s+/);
+
+        for (const word of words) {
+          if (!word) {
+            continue;
+          }
+
+          const candidate = line ? `${line} ${word}` : word;
+          if (this.stripAnsi(candidate).length <= width) {
+            line = candidate;
+          } else {
+            if (line) {
+              result.push(line);
+              line = '';
+            }
+
+            if (this.stripAnsi(word).length > width) {
+              let remaining = word;
+              while (this.stripAnsi(remaining).length > width) {
+                result.push(remaining.slice(0, width));
+                remaining = remaining.slice(width);
+              }
+              line = remaining;
+            } else {
+              line = word;
+            }
+          }
+        }
+
+        if (line) {
+          result.push(line);
+        }
+      }
+
+      if (index < paragraphs.length - 1 && result[result.length - 1] !== '') {
+        result.push('');
+      }
+    });
+
+    return result.length > 0 ? result : [''];
+  }
+
+  private renderMessageBubble(role: Message['role'] | 'context', content: string, options?: { title?: string }): void {
+    const label = options?.title || this.getRoleLabel(role);
+    const color = this.getRoleColor(role);
+    const lines = this.wrapContent(content, this.bubbleWidth);
+    const maxWidth = Math.max(this.stripAnsi(label).length, ...lines.map(line => this.stripAnsi(line).length));
+    const horizontal = '─'.repeat(maxWidth + 2);
+
+    console.log();
+    console.log(color(`╭─ ${label.padEnd(maxWidth, ' ')} ╮`));
+    for (const line of lines) {
+      const padding = ' '.repeat(maxWidth - this.stripAnsi(line).length);
+      console.log(color(`│ ${line}${padding} │`));
+    }
+    console.log(color(`╰─${horizontal}─╯`));
+  }
+
+  private getRoleLabel(role: Message['role'] | 'context'): string {
+    switch (role) {
+      case 'user':
+        return 'You';
+      case 'assistant':
+        return 'Assistant';
+      case 'system':
+        return 'System Prompt';
+      case 'context':
+      default:
+        return 'Context';
+    }
+  }
+
+  private getRoleColor(role: Message['role'] | 'context'): chalk.Chalk {
+    switch (role) {
+      case 'user':
+        return chalk.hex('#FFB300');
+      case 'assistant':
+        return chalk.hex('#7E57C2');
+      case 'system':
+      case 'context':
+        return chalk.hex('#26A69A');
+      default:
+        return chalk.cyan;
+    }
+  }
+
+  private renderHeader(): void {
+    console.log(chalk.hex('#7E57C2').bold('\n╭──────────────────────────────────────────────╮'));
+    console.log(chalk.hex('#7E57C2').bold('│           AI Gateway · Gemini Mode           │'));
+    console.log(chalk.hex('#7E57C2').bold('╰──────────────────────────────────────────────╯'));
+    console.log(chalk.gray(`Model: ${this.config.model}  ·  Temperature: ${this.config.temperature}`));
+    if (this.config.systemPrompt) {
+      this.displayMessage('system', this.config.systemPrompt);
+    }
+    console.log(chalk.gray('Type /help for commands. Use Ctrl+C to exit.'));
+  }
+
+  private renderCommandReference(): void {
+    this.printPanel(
+      'Commands',
+      [
+        chalk.gray('/clear       Clear conversation history'),
+        chalk.gray('/stats       Show conversation statistics'),
+        chalk.gray('/file        Chat with file content'),
+        chalk.gray('/read        Preview a file with line numbers'),
+        chalk.gray('/write       Overwrite a file with new content'),
+        chalk.gray('/append      Append text to a file'),
+        chalk.gray('/shell       Run a shell command'),
+        chalk.gray('/model       Change model'),
+        chalk.gray('/temp        Change temperature'),
+        chalk.gray('/prompt      View or update system prompt'),
+        chalk.gray('/exit        Exit'),
+        chalk.gray('/help        Show this help'),
+      ],
+      chalk.hex('#3949AB'),
+    );
+  }
+
+  renderSessionHeader(includeCommands: boolean = false): void {
+    this.renderHeader();
+    if (includeCommands) {
+      this.renderCommandReference();
+    }
+  }
+
+  displayMessage(role: Message['role'] | 'context', content: string, title?: string): void {
+    this.renderMessageBubble(role, content, title ? { title } : undefined);
+  }
+
   async chat(userMessage: string, stream: boolean = true): Promise<string> {
-    // Add user message to history
-    this.conversationHistory.push({
+    const userEntry: Message = {
       role: 'user',
       content: userMessage,
-    });
+    };
+
+    this.conversationHistory.push(userEntry);
+
+    const spinner = ora({ text: chalk.gray('Thinking...'), spinner: 'dots' }).start();
 
     try {
       if (stream) {
@@ -71,11 +238,10 @@ class GeminiStyleCLI {
         for await (const chunk of response) {
           const content = chunk.choices[0]?.delta?.content || '';
           fullResponse += content;
-          process.stdout.write(content);
         }
-        console.log(); // New line after streaming
 
-        // Add assistant response to history
+        spinner.stop();
+
         this.conversationHistory.push({
           role: 'assistant',
           content: fullResponse,
@@ -91,8 +257,9 @@ class GeminiStyleCLI {
         });
 
         const content = response.choices[0].message.content || '';
-        
-        // Add assistant response to history
+
+        spinner.stop();
+
         this.conversationHistory.push({
           role: 'assistant',
           content: content,
@@ -101,6 +268,8 @@ class GeminiStyleCLI {
         return content;
       }
     } catch (error: any) {
+      spinner.stop();
+      this.conversationHistory.pop();
       console.error(chalk.red('\nError:'), error.message);
       throw error;
     }
@@ -119,12 +288,7 @@ class GeminiStyleCLI {
 
   clearHistory(): void {
     this.conversationHistory = [];
-    if (this.config.systemPrompt) {
-      this.conversationHistory.push({
-        role: 'system',
-        content: this.config.systemPrompt,
-      });
-    }
+    this.setSystemPrompt(this.config.systemPrompt);
   }
 
   getHistory(): Message[] {
@@ -135,34 +299,166 @@ class GeminiStyleCLI {
     const messageCount = this.conversationHistory.filter(m => m.role !== 'system').length;
     const userMessages = this.conversationHistory.filter(m => m.role === 'user').length;
     const assistantMessages = this.conversationHistory.filter(m => m.role === 'assistant').length;
-    
-    console.log(chalk.cyan('\n📊 Conversation Stats:'));
-    console.log(chalk.gray(`   Messages: ${messageCount}`));
-    console.log(chalk.gray(`   User: ${userMessages} | Assistant: ${assistantMessages}`));
-    console.log(chalk.gray(`   Model: ${this.config.model}`));
+
+    const summary = [
+      `Total messages: ${messageCount}`,
+      `You vs Assistant: ${userMessages} | ${assistantMessages}`,
+      `Model: ${this.config.model}`,
+    ].join('\n');
+
+    this.displayMessage('context', summary, 'Conversation Stats');
+  }
+
+  private stripAnsi(text: string): string {
+    return text.replace(/\u001b\[[0-9;?]*[ -\/]*[@-~]/g, '');
+  }
+
+  private parseArgs(line: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let quote: string | null = null;
+    let escape = false;
+
+    const pushCurrent = () => {
+      if (current.length > 0) {
+        args.push(current);
+        current = '';
+      }
+    };
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (escape) {
+        current += char;
+        escape = false;
+        continue;
+      }
+
+      if (char === '\\' && quote) {
+        escape = true;
+        continue;
+      }
+
+      if (quote) {
+        if (char === quote) {
+          quote = null;
+          continue;
+        }
+
+        current += char;
+        continue;
+      }
+
+      if (char === '"' || char === '\'' || char === '`') {
+        if (current.length > 0) {
+          pushCurrent();
+        }
+        quote = char;
+        continue;
+      }
+
+      if (/\s/.test(char)) {
+        pushCurrent();
+        continue;
+      }
+
+      current += char;
+    }
+
+    if (current.length > 0) {
+      pushCurrent();
+    }
+
+    return args;
+  }
+
+  private printPanel(title: string, body: string | string[], color: chalk.Chalk = chalk.cyan): void {
+    const lines = Array.isArray(body) ? body : body.split('\n');
+    const contentWidth = Math.max(
+      ...lines.map(line => this.stripAnsi(line).length),
+      this.stripAnsi(title).length,
+    );
+    const horizontal = '═'.repeat(contentWidth + 4);
+    console.log(color(`\n╔${horizontal}╗`));
+    const titleText = chalk.bold(title.padEnd(contentWidth, ' '));
+    console.log(color(`║  ${titleText}  ║`));
+    console.log(color(`╠${horizontal}╣`));
+    for (const line of lines) {
+      const strippedLength = this.stripAnsi(line).length;
+      const padding = ' '.repeat(contentWidth - strippedLength);
+      console.log(color(`║  ${line}${padding}  ║`));
+    }
+    console.log(color(`╚${horizontal}╝`));
     console.log();
   }
 
+  private async executeShellCommand(command: string): Promise<void> {
+    const spinner = ora({ text: chalk.gray(`Running: ${command}`), spinner: 'dots' }).start();
+    try {
+      const { stdout, stderr } = await this.execAsync(command, { maxBuffer: 10 * 1024 * 1024 });
+      spinner.stop();
+
+      if (stdout.trim()) {
+        this.printPanel('Shell Output', stdout.trim().split('\n'), chalk.green);
+      } else {
+        this.printPanel('Shell Output', ['(no output)'], chalk.green);
+      }
+
+      if (stderr.trim()) {
+        this.printPanel('Shell Errors', stderr.trim().split('\n'), chalk.red);
+      }
+    } catch (error: any) {
+      spinner.stop();
+      const message = error.stderr || error.message || 'Unknown error';
+      this.printPanel('Shell Error', message.toString().trim().split('\n'), chalk.red);
+    }
+  }
+
+  private async displayFileContent(filePath: string): Promise<void> {
+    const spinner = ora({ text: chalk.gray(`Reading ${filePath}`), spinner: 'dots' }).start();
+    try {
+      const absolute = path.resolve(filePath);
+      const stats = await fs.promises.stat(absolute);
+      if (!stats.isFile()) {
+        throw new Error('The specified path is not a file');
+      }
+
+      const content = await fs.promises.readFile(absolute, 'utf-8');
+      spinner.stop();
+      const lines = content.split('\n').map((line, index) => {
+        const lineNumber = chalk.gray(`${index + 1}`.padStart(4, ' '));
+        return `${lineNumber} ${line}`;
+      });
+      this.printPanel(`File: ${path.relative(process.cwd(), absolute)}`, lines.length ? lines : ['(empty file)']);
+    } catch (error: any) {
+      spinner.stop();
+      this.printPanel('File Read Error', error.message.split('\n'), chalk.red);
+    }
+  }
+
+  private async writeFileContent(filePath: string, content: string, append: boolean = false): Promise<void> {
+    const absolute = path.resolve(filePath);
+    const action = append ? 'Appending to' : 'Writing to';
+    const spinner = ora({ text: chalk.gray(`${action} ${absolute}`), spinner: 'dots' }).start();
+    try {
+      await fs.promises.mkdir(path.dirname(absolute), { recursive: true });
+      if (append) {
+        await fs.promises.appendFile(absolute, content);
+      } else {
+        await fs.promises.writeFile(absolute, content);
+      }
+      spinner.stop();
+      this.printPanel('File Saved', [`${append ? 'Appended' : 'Wrote'} ${content.length} characters`, `Path: ${path.relative(process.cwd(), absolute)}`], chalk.green);
+    } catch (error: any) {
+      spinner.stop();
+      this.printPanel('File Write Error', error.message.split('\n'), chalk.red);
+    }
+  }
+
   async repl(): Promise<void> {
-    console.log(chalk.green('╔════════════════════════════════════════════════════════════╗'));
-    console.log(chalk.green('║            AI Gateway CLI - Interactive Mode                ║'));
-    console.log(chalk.green('╚════════════════════════════════════════════════════════════╝'));
-    console.log();
-    console.log(chalk.cyan(`Model: ${this.config.model}`));
-    console.log(chalk.gray(`Temperature: ${this.config.temperature}`));
-    console.log();
-    console.log(chalk.yellow('Commands:'));
-    console.log(chalk.gray('  /clear     - Clear conversation history'));
-    console.log(chalk.gray('  /stats     - Show conversation statistics'));
-    console.log(chalk.gray('  /file      - Chat with file content'));
-    console.log(chalk.gray('  /model     - Change model'));
-    console.log(chalk.gray('  /temp      - Change temperature'));
-    console.log(chalk.gray('  /exit      - Exit (or Ctrl+C)'));
-    console.log(chalk.gray('  /help      - Show this help'));
-    console.log();
-    console.log(chalk.gray('Just type your message and press Enter to chat!'));
-    console.log(chalk.gray('─'.repeat(60)));
-    console.log();
+    console.clear();
+    this.renderSessionHeader(true);
 
     const rl = readline.createInterface({
       input: process.stdin,
@@ -170,20 +466,30 @@ class GeminiStyleCLI {
       prompt: chalk.yellow('You> '),
     });
 
-    rl.prompt();
+    const promptUser = () => {
+      rl.setPrompt(chalk.yellow('You> '));
+      rl.prompt();
+    };
+
+    promptUser();
 
     rl.on('line', async (line: string) => {
       const input = line.trim();
 
       if (!input) {
-        rl.prompt();
+        promptUser();
         return;
       }
 
-      // Handle commands
       if (input.startsWith('/')) {
-        const [command, ...args] = input.slice(1).split(' ');
-        
+        const [command, ...args] = this.parseArgs(input.slice(1));
+
+        if (!command) {
+          console.log(chalk.red('Please provide a command after "/".'));
+          promptUser();
+          return;
+        }
+
         switch (command.toLowerCase()) {
           case 'exit':
           case 'quit':
@@ -194,34 +500,78 @@ class GeminiStyleCLI {
 
           case 'clear':
             this.clearHistory();
-            console.log(chalk.gray('✓ Conversation history cleared\n'));
+            console.clear();
+            this.renderSessionHeader(true);
+            console.log(chalk.gray('✓ Conversation history cleared'));
             break;
 
           case 'stats':
             this.showStats();
             break;
 
-          case 'file':
-            const filePath = args.join(' ').trim();
-            if (!filePath) {
+          case 'file': {
+            if (args.length === 0) {
               console.log(chalk.red('Usage: /file <path> <message>'));
               console.log(chalk.gray('Example: /file ./code.ts Review this code'));
             } else {
-              const parts = filePath.split(' ');
-              const file = parts[0];
-              const message = parts.slice(1).join(' ') || 'Analyze this file';
-              
-              console.log(chalk.cyan('\nAssistant> '));
+              const file = args[0];
+              const message = args.slice(1).join(' ') || 'Analyze this file';
+              const resolved = path.resolve(file);
+              this.displayMessage('user', `${message}\n\n📎 ${resolved}`);
               try {
-                await this.chatWithFile(message, file);
+                const assistantReply = await this.chatWithFile(message, file);
+                this.displayMessage('assistant', assistantReply);
               } catch (error) {
                 // Error already logged
               }
-              console.log();
             }
             break;
+          }
 
-          case 'model':
+          case 'read': {
+            const target = args[0];
+            if (!target) {
+              console.log(chalk.red('Usage: /read <file>'));
+            } else {
+              await this.displayFileContent(target);
+            }
+            break;
+          }
+
+          case 'write': {
+            const [target, ...contentParts] = args;
+            if (!target || contentParts.length === 0) {
+              console.log(chalk.red('Usage: /write <file> <content>'));
+              console.log(chalk.gray('Tip: surround multi-word paths with quotes.'));
+            } else {
+              await this.writeFileContent(target, contentParts.join(' '), false);
+            }
+            break;
+          }
+
+          case 'append': {
+            const [target, ...contentParts] = args;
+            if (!target || contentParts.length === 0) {
+              console.log(chalk.red('Usage: /append <file> <content>'));
+              console.log(chalk.gray('Tip: surround multi-word paths with quotes.'));
+            } else {
+              await this.writeFileContent(target, `${contentParts.join(' ')}\n`, true);
+            }
+            break;
+          }
+
+          case 'shell': {
+            const command = args.join(' ').trim();
+            if (!command) {
+              console.log(chalk.red('Usage: /shell <command>'));
+              console.log(chalk.gray('Example: /shell ls -la'));
+            } else {
+              await this.executeShellCommand(command);
+            }
+            break;
+          }
+
+          case 'model': {
             const newModel = args.join(' ').trim();
             if (!newModel) {
               console.log(chalk.yellow(`Current model: ${this.config.model}`));
@@ -246,52 +596,62 @@ class GeminiStyleCLI {
               console.log(chalk.gray('    - google/gemini-pro'));
             } else {
               this.config.model = newModel;
-              console.log(chalk.green(`✓ Model changed to: ${newModel}\n`));
+              console.log(chalk.green(`✓ Model changed to: ${newModel}`));
             }
             break;
+          }
 
           case 'temp':
-          case 'temperature':
+          case 'temperature': {
             const temp = parseFloat(args[0]);
             if (isNaN(temp)) {
               console.log(chalk.yellow(`Current temperature: ${this.config.temperature}`));
               console.log(chalk.gray('Usage: /temp <0.0-2.0>'));
             } else {
               this.config.temperature = Math.max(0, Math.min(2, temp));
-              console.log(chalk.green(`✓ Temperature set to: ${this.config.temperature}\n`));
+              console.log(chalk.green(`✓ Temperature set to: ${this.config.temperature}`));
             }
             break;
+          }
+
+          case 'prompt': {
+            if (args.length === 0) {
+              this.displayMessage('system', this.config.systemPrompt || '(not set)');
+            } else if (args[0].toLowerCase() === 'reset') {
+              this.setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+              console.log(chalk.green('✓ System prompt reset to default.'));
+              this.displayMessage('system', this.config.systemPrompt || '');
+            } else {
+              const newPrompt = args.join(' ');
+              this.setSystemPrompt(newPrompt);
+              console.log(chalk.green('✓ System prompt updated.'));
+              this.displayMessage('system', newPrompt);
+            }
+            break;
+          }
 
           case 'help':
-            console.log(chalk.yellow('\nCommands:'));
-            console.log(chalk.gray('  /clear     - Clear conversation history'));
-            console.log(chalk.gray('  /stats     - Show conversation statistics'));
-            console.log(chalk.gray('  /file      - Chat with file content'));
-            console.log(chalk.gray('  /model     - Change model'));
-            console.log(chalk.gray('  /temp      - Change temperature'));
-            console.log(chalk.gray('  /exit      - Exit'));
-            console.log(chalk.gray('  /help      - Show this help\n'));
+            this.renderCommandReference();
             break;
 
           default:
             console.log(chalk.red(`Unknown command: /${command}`));
-            console.log(chalk.gray('Type /help for available commands\n'));
+            console.log(chalk.gray('Type /help for available commands.'));
         }
 
-        rl.prompt();
+        promptUser();
         return;
       }
 
-      // Regular chat
+      this.displayMessage('user', input);
       try {
-        console.log(chalk.cyan('\nAssistant> '));
-        await this.chat(input);
-        console.log();
+        const assistantReply = await this.chat(input);
+        this.displayMessage('assistant', assistantReply);
       } catch (error) {
         // Error already logged
       }
 
-      rl.prompt();
+      promptUser();
     });
 
     rl.on('close', () => {
@@ -338,15 +698,19 @@ program
     // If message provided, one-shot mode
     if (message) {
       try {
-        console.log(chalk.cyan('Assistant> '));
-        
+        console.clear();
+        cli.renderSessionHeader(false);
+
         if (options.file) {
-          await cli.chatWithFile(message, options.file);
+          const resolved = path.resolve(options.file);
+          cli.displayMessage('user', `${message}\n\n📎 ${resolved}`);
+          const assistantReply = await cli.chatWithFile(message, options.file);
+          cli.displayMessage('assistant', assistantReply);
         } else {
-          await cli.chat(message);
+          cli.displayMessage('user', message);
+          const assistantReply = await cli.chat(message);
+          cli.displayMessage('assistant', assistantReply);
         }
-        
-        console.log();
       } catch (error) {
         process.exit(1);
       }
