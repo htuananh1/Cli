@@ -1,116 +1,134 @@
 # AI Gateway CLI
 
-A powerful command-line interface for interacting with AI models through the AI Gateway service. This CLI provides an easy way to chat with various AI models including DeepSeek, OpenAI GPT, Claude, Gemini, and more.
+A powerful command-line interface for interacting with AI models through the AI Gateway service. Built with TypeScript and Node.js, this CLI provides an easy way to chat with various AI models including DeepSeek, OpenAI GPT, Claude, Gemini, and more.
 
 ## Features
 
 - 🚀 **Simple Chat Interface**: Send single prompts or have interactive conversations
-- 🔄 **Streaming Support**: Real-time streaming responses
+- 🔄 **Streaming Support**: Real-time streaming responses with beautiful output
 - 🎯 **Multiple Models**: Support for various AI models (DeepSeek, GPT-4, Claude, etc.)
 - 💾 **JSON Output**: Get structured JSON responses for programmatic use
 - 🎨 **System Prompts**: Customize AI behavior with system prompts
 - ⚙️ **Configurable**: Control temperature, max tokens, and more
 - 🔐 **Secure**: Uses environment variables for API key management
+- 🎭 **Interactive Mode**: Full conversation support with context
+- 🌈 **Colorful Output**: Beautiful terminal UI with colors and spinners
+
+## Quick Start với npx
+
+Chạy ngay lập tức mà không cần cài đặt:
+
+```bash
+# Set API key
+export AI_GATEWAY_API_KEY="your-api-key-here"
+
+# Chạy với npx (sau khi publish)
+npx ai-gateway-cli chat "Why is the sky blue?"
+```
 
 ## Installation
 
-### Quick Install
+### Cài đặt toàn cục
 
 ```bash
-pip install -r requirements.txt
-chmod +x ai_gateway_cli.py
+npm install -g ai-gateway-cli
 ```
 
-### Install as a Command
+### Cài đặt cho development
 
 ```bash
-pip install -e .
-```
+# Clone repo
+git clone <repo-url>
+cd ai-gateway-cli
 
-This will install the `ai-gateway` command globally.
+# Cài đặt dependencies
+npm install
+
+# Build project
+npm run build
+
+# Link để sử dụng locally
+npm link
+```
 
 ## Configuration
 
-Set your API key as an environment variable:
+Tạo file `.env` trong thư mục dự án hoặc set environment variables:
 
 ```bash
 export AI_GATEWAY_API_KEY="your-api-key-here"
+export AI_GATEWAY_BASE_URL="https://ai-gateway.vercel.sh/v1"  # Optional
 ```
 
-Optionally, you can set a custom base URL:
+Hoặc copy từ file mẫu:
 
 ```bash
-export AI_GATEWAY_BASE_URL="https://ai-gateway.vercel.sh/v1"
+cp .env.example .env
+# Sau đó edit .env và thêm API key của bạn
 ```
 
 ## Usage
 
 ### Basic Chat
 
-Send a single message:
-
-```bash
-python ai_gateway_cli.py chat "Why is the sky blue?"
-```
-
-Or if installed:
+Gửi một tin nhắn đơn giản:
 
 ```bash
 ai-gateway chat "Why is the sky blue?"
 ```
 
-### Using Different Models
+### Với model khác
 
 ```bash
-python ai_gateway_cli.py chat "Explain quantum computing" --model openai/gpt-4
+ai-gateway chat "Explain quantum computing" --model openai/gpt-4
 ```
 
-### With System Prompt
+### Với System Prompt
 
 ```bash
-python ai_gateway_cli.py chat "Write a poem about autumn" --system "You are a creative poet who writes in haiku style"
+ai-gateway chat "Write a poem about autumn" --system "You are a creative poet who writes in haiku style"
 ```
 
 ### Streaming Responses
 
-Get real-time streaming output:
+Xem response real-time khi AI đang generate:
 
 ```bash
-python ai_gateway_cli.py chat "Tell me a story" --stream
+ai-gateway chat "Tell me a story" --stream
 ```
 
 ### JSON Output
 
-Get structured JSON response:
+Nhận response dạng JSON để xử lý:
 
 ```bash
-python ai_gateway_cli.py chat "Hello, AI!" --json
+ai-gateway chat "Hello, AI!" --json
 ```
 
 ### Interactive Mode
 
-Start an interactive chat session:
+Bắt đầu cuộc trò chuyện tương tác:
 
 ```bash
-python ai_gateway_cli.py interactive
+ai-gateway interactive
 ```
 
-In interactive mode:
-- Type your messages and get responses
-- Type `clear` to reset conversation history
-- Type `exit` or `quit` to end the session
-- Use Ctrl+C to quit
+Trong interactive mode:
+- Gõ tin nhắn và nhận response
+- Gõ `clear` để xóa lịch sử hội thoại
+- Gõ `exit` hoặc `quit` để kết thúc
+- Nhấn Ctrl+C để thoát
 
-### Interactive with Custom Model
+### Interactive với Custom Model
 
 ```bash
-python ai_gateway_cli.py interactive --model anthropic/claude-3-sonnet
+ai-gateway interactive --model anthropic/claude-3-sonnet
 ```
 
 ### Advanced Options
 
 ```bash
-python ai_gateway_cli.py chat "Explain AI" \
+ai-gateway chat "Explain AI" \
   --model openai/gpt-4 \
   --temperature 0.9 \
   --max-tokens 500 \
@@ -121,12 +139,12 @@ python ai_gateway_cli.py chat "Explain AI" \
 ### List Available Models
 
 ```bash
-python ai_gateway_cli.py list-models
+ai-gateway list-models
 ```
 
 ## Available Models
 
-The CLI supports various models including:
+CLI hỗ trợ nhiều models:
 
 - **DeepSeek**: `deepseek/deepseek-v3.2-exp`
 - **OpenAI**: `openai/gpt-4-turbo`, `openai/gpt-4`, `openai/gpt-3.5-turbo`
@@ -137,35 +155,35 @@ The CLI supports various models including:
 
 ## Command Reference
 
-### `chat` - Send a single message
+### `chat` - Gửi một tin nhắn
 
 ```bash
-python ai_gateway_cli.py chat <prompt> [options]
+ai-gateway chat <prompt> [options]
 ```
 
 **Options:**
-- `--model, -m`: Model to use (default: deepseek/deepseek-v3.2-exp)
-- `--system, -s`: System prompt to set context
-- `--temperature, -t`: Sampling temperature 0-2 (default: 0.7)
-- `--max-tokens`: Maximum tokens to generate
-- `--stream`: Stream the response in real-time
-- `--json`: Output response as JSON
+- `-m, --model <model>`: Model sử dụng (default: deepseek/deepseek-v3.2-exp)
+- `-s, --system <prompt>`: System prompt để set context
+- `-t, --temperature <number>`: Temperature 0-2 (default: 0.7)
+- `--max-tokens <number>`: Số tokens tối đa
+- `--stream`: Stream response real-time
+- `--json`: Output dạng JSON
 
 ### `interactive` - Interactive chat session
 
 ```bash
-python ai_gateway_cli.py interactive [options]
+ai-gateway interactive [options]
 ```
 
 **Options:**
-- `--model, -m`: Model to use (default: deepseek/deepseek-v3.2-exp)
-- `--system, -s`: System prompt to set context
-- `--temperature, -t`: Sampling temperature 0-2 (default: 0.7)
+- `-m, --model <model>`: Model sử dụng (default: deepseek/deepseek-v3.2-exp)
+- `-s, --system <prompt>`: System prompt để set context
+- `-t, --temperature <number>`: Temperature 0-2 (default: 0.7)
 
-### `list-models` - List available models
+### `list-models` - List các models có sẵn
 
 ```bash
-python ai_gateway_cli.py list-models
+ai-gateway list-models
 ```
 
 ## Examples
@@ -173,7 +191,7 @@ python ai_gateway_cli.py list-models
 ### Code Generation
 
 ```bash
-python ai_gateway_cli.py chat "Write a Python function to calculate fibonacci numbers" \
+ai-gateway chat "Write a TypeScript function to calculate fibonacci numbers" \
   --model openai/gpt-4 \
   --temperature 0.3
 ```
@@ -181,7 +199,7 @@ python ai_gateway_cli.py chat "Write a Python function to calculate fibonacci nu
 ### Creative Writing
 
 ```bash
-python ai_gateway_cli.py chat "Write a short sci-fi story" \
+ai-gateway chat "Write a short sci-fi story" \
   --model anthropic/claude-3-opus \
   --temperature 1.2 \
   --max-tokens 1000 \
@@ -191,7 +209,7 @@ python ai_gateway_cli.py chat "Write a short sci-fi story" \
 ### Data Analysis Help
 
 ```bash
-python ai_gateway_cli.py interactive \
+ai-gateway interactive \
   --model openai/gpt-4 \
   --system "You are a data science expert specializing in Python and pandas"
 ```
@@ -199,33 +217,83 @@ python ai_gateway_cli.py interactive \
 ### Get JSON for Parsing
 
 ```bash
-python ai_gateway_cli.py chat "List 5 programming languages" \
-  --json > response.json
+ai-gateway chat "List 5 programming languages" --json > response.json
+```
+
+### Sử dụng trong code TypeScript/JavaScript
+
+```typescript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env.AI_GATEWAY_API_KEY,
+  baseURL: 'https://ai-gateway.vercel.sh/v1'
+});
+
+const response = await client.chat.completions.create({
+  model: 'deepseek/deepseek-v3.2-exp',
+  messages: [
+    {
+      role: 'user',
+      content: 'Why is the sky blue?'
+    }
+  ]
+});
+
+console.log(response.choices[0].message.content);
 ```
 
 ## Environment Variables
 
-- `AI_GATEWAY_API_KEY` (required): Your API key for authentication
+- `AI_GATEWAY_API_KEY` (required): API key cho authentication
 - `AI_GATEWAY_BASE_URL` (optional): Custom base URL (default: https://ai-gateway.vercel.sh/v1)
+
+## Development
+
+### Build
+
+```bash
+npm run build
+```
+
+### Run in Development Mode
+
+```bash
+npm run dev -- chat "Hello"
+```
+
+### Link Locally
+
+```bash
+npm link
+ai-gateway chat "Test message"
+```
+
+## Project Structure
+
+```
+ai-gateway-cli/
+├── src/
+│   ├── index.ts         # Main CLI file
+│   └── example.ts       # Example usage
+├── dist/                # Compiled JavaScript (after build)
+├── package.json         # NPM configuration
+├── tsconfig.json        # TypeScript configuration
+├── .env.example         # Environment variables template
+└── README.md           # Documentation
+```
 
 ## Error Handling
 
-The CLI provides clear error messages for common issues:
+CLI cung cấp error messages rõ ràng cho các vấn đề thường gặp:
 
 - Missing API key
 - Network errors
 - Invalid model names
 - Rate limiting
+- Invalid parameters
 
-## Development
-
-### Running Tests
-
-```bash
-python -m pytest tests/
-```
-
-### Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -239,4 +307,4 @@ For issues and questions, please open an issue on GitHub.
 
 ---
 
-**Happy chatting with AI! 🤖**
+**Happy chatting với AI! 🤖🚀**
