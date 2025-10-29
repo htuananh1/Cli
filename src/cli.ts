@@ -586,6 +586,154 @@ class GeminiStyleCLI {
     this.printPanel('Configuration', config, chalk.cyan);
   }
 
+  private async handleFileCommand(command: string, args: string[]): Promise<void> {
+    switch (command.toLowerCase()) {
+      case 'read': {
+        const target = args[0];
+        if (!target) {
+          console.log(chalk.red('Usage: @read <file> [start_line] [end_line]'));
+          console.log(chalk.gray('Example: @read cli.ts 1 20'));
+        } else {
+          const startLine = args[1] ? parseInt(args[1]) : 1;
+          const endLine = args[2] ? parseInt(args[2]) : undefined;
+          await this.displayFileContent(target, startLine, endLine);
+        }
+        break;
+      }
+
+      case 'edit': {
+        const target = args[0];
+        if (!target) {
+          console.log(chalk.red('Usage: @edit <file>'));
+          console.log(chalk.gray('Example: @edit config.json'));
+        } else {
+          await this.editFile(target);
+        }
+        break;
+      }
+
+      case 'write': {
+        const [target, ...contentParts] = args;
+        if (!target || contentParts.length === 0) {
+          console.log(chalk.red('Usage: @write <file> <content>'));
+          console.log(chalk.gray('Example: @write test.js "console.log(\'hello\')"'));
+        } else {
+          await this.writeFileContent(target, contentParts.join(' '), false);
+        }
+        break;
+      }
+
+      case 'append': {
+        const [target, ...contentParts] = args;
+        if (!target || contentParts.length === 0) {
+          console.log(chalk.red('Usage: @append <file> <content>'));
+          console.log(chalk.gray('Example: @append log.txt "New entry"'));
+        } else {
+          await this.writeFileContent(target, `${contentParts.join(' ')}\n`, true);
+        }
+        break;
+      }
+
+      case 'delete': {
+        const target = args[0];
+        if (!target) {
+          console.log(chalk.red('Usage: @delete <file_or_directory>'));
+          console.log(chalk.gray('Example: @delete old-file.txt'));
+        } else {
+          await this.deleteFileOrDirectory(target);
+        }
+        break;
+      }
+
+      case 'ls': {
+        const dir = args[0] || '.';
+        await this.listDirectory(dir);
+        break;
+      }
+
+      case 'cd': {
+        const newDir = args[0];
+        if (!newDir) {
+          console.log(chalk.yellow(`Current directory: ${this.currentDirectory}`));
+        } else {
+          try {
+            const absolute = path.resolve(this.currentDirectory, newDir);
+            const stats = await fs.promises.stat(absolute);
+            if (stats.isDirectory()) {
+              this.currentDirectory = absolute;
+              console.log(chalk.green(`✓ Changed to: ${this.currentDirectory}`));
+            } else {
+              console.log(chalk.red('Error: Not a directory'));
+            }
+          } catch (error: any) {
+            console.log(chalk.red(`Error: ${error.message}`));
+          }
+        }
+        break;
+      }
+
+      case 'pwd': {
+        console.log(chalk.cyan(`Current directory: ${this.currentDirectory}`));
+        break;
+      }
+
+      case 'find': {
+        const pattern = args[0];
+        if (!pattern) {
+          console.log(chalk.red('Usage: @find <pattern>'));
+          console.log(chalk.gray('Example: @find "*.js"'));
+        } else {
+          await this.findFiles(pattern);
+        }
+        break;
+      }
+
+      case 'shell': {
+        const command = args.join(' ').trim();
+        if (!command) {
+          console.log(chalk.red('Usage: @shell <command>'));
+          console.log(chalk.gray('Example: @shell ls -la'));
+        } else {
+          await this.executeShellCommand(command, false);
+        }
+        break;
+      }
+
+      case 'interactive': {
+        const command = args.join(' ').trim();
+        if (!command) {
+          console.log(chalk.red('Usage: @interactive <command>'));
+          console.log(chalk.gray('Example: @interactive vim file.txt'));
+        } else {
+          await this.executeShellCommand(command, true);
+        }
+        break;
+      }
+
+      case 'help': {
+        this.printPanel('File Commands (@)', [
+          this.getThemedText('@read <file> [start] [end] - View file with syntax highlighting', 'gray'),
+          this.getThemedText('@edit <file> - Interactive file editor', 'gray'),
+          this.getThemedText('@write <file> <content> - Create or overwrite file', 'gray'),
+          this.getThemedText('@append <file> <content> - Append text to file', 'gray'),
+          this.getThemedText('@delete <file> - Delete file or directory', 'gray'),
+          this.getThemedText('@ls [dir] - List directory contents', 'gray'),
+          this.getThemedText('@cd [dir] - Change directory', 'gray'),
+          this.getThemedText('@pwd - Show current directory', 'gray'),
+          this.getThemedText('@find <pattern> - Search for files', 'gray'),
+          this.getThemedText('@shell <command> - Run shell command', 'gray'),
+          this.getThemedText('@interactive <command> - Run interactive command', 'gray'),
+          this.getThemedText('@help - Show this help', 'gray'),
+        ]);
+        break;
+      }
+
+      default:
+        console.log(chalk.red(`Unknown file command: @${command}`));
+        console.log(chalk.gray('Type @help for available file commands\n'));
+    }
+  }
+
   private async editFile(filePath: string): Promise<void> {
     const absolute = path.resolve(this.currentDirectory, filePath);
     
@@ -721,20 +869,24 @@ class GeminiStyleCLI {
     ], chalk.green);
 
     this.printPanel('Commands', [
+      this.getThemedText('📁 File Operations (@)', 'cyan'),
+      this.getThemedText('@read <file>     View file with syntax highlighting', 'gray'),
+      this.getThemedText('@edit <file>     Interactive file editor', 'gray'),
+      this.getThemedText('@write <file>    Create or overwrite file', 'gray'),
+      this.getThemedText('@append <file>   Append text to file', 'gray'),
+      this.getThemedText('@delete <file>   Delete file or directory', 'gray'),
+      this.getThemedText('@ls [dir]        List directory contents', 'gray'),
+      this.getThemedText('@cd [dir]        Change directory', 'gray'),
+      this.getThemedText('@pwd             Show current directory', 'gray'),
+      this.getThemedText('@find <pattern>  Search for files', 'gray'),
+      this.getThemedText('@shell <cmd>     Run shell command', 'gray'),
+      this.getThemedText('@interactive     Run interactive command', 'gray'),
+      this.getThemedText('@help            Show file commands help', 'gray'),
+      this.getThemedText('', 'gray'),
+      this.getThemedText('⚙️ System Settings (/)', 'cyan'),
       this.getThemedText('/clear       Clear conversation history', 'gray'),
       this.getThemedText('/stats       Show conversation statistics', 'gray'),
       this.getThemedText('/file        Chat with file content', 'gray'),
-      this.getThemedText('/read        Preview a file with line numbers', 'gray'),
-      this.getThemedText('/edit        Interactive file editor', 'gray'),
-      this.getThemedText('/write       Overwrite a file with new content', 'gray'),
-      this.getThemedText('/append      Append text to a file', 'gray'),
-      this.getThemedText('/delete      Delete a file or directory', 'gray'),
-      this.getThemedText('/shell       Run a shell command', 'gray'),
-      this.getThemedText('/interactive Run interactive shell command', 'gray'),
-      this.getThemedText('/ls          List directory contents', 'gray'),
-      this.getThemedText('/cd          Change directory', 'gray'),
-      this.getThemedText('/pwd         Show current directory', 'gray'),
-      this.getThemedText('/find        Search for files', 'gray'),
       this.getThemedText('/history     Show command history', 'gray'),
       this.getThemedText('/model       Change model', 'gray'),
       this.getThemedText('/temp        Change temperature', 'gray'),
@@ -760,7 +912,15 @@ class GeminiStyleCLI {
         return;
       }
 
-      // Handle commands
+      // Handle file operations with @
+      if (input.startsWith('@')) {
+        const [command, ...args] = this.parseArgs(input.slice(1));
+        await this.handleFileCommand(command, args);
+        rl.prompt();
+        return;
+      }
+
+      // Handle system settings with /
       if (input.startsWith('/')) {
         const [command, ...args] = this.parseArgs(input.slice(1));
 
@@ -804,126 +964,6 @@ class GeminiStyleCLI {
               console.log();
             }
             break;
-
-          case 'read': {
-            const target = args[0];
-            if (!target) {
-              console.log(chalk.red('Usage: /read <file> [start_line] [end_line]'));
-              console.log(chalk.gray('Example: /read file.js 10 20'));
-            } else {
-              const startLine = args[1] ? parseInt(args[1]) : 1;
-              const endLine = args[2] ? parseInt(args[2]) : undefined;
-              await this.displayFileContent(target, startLine, endLine);
-            }
-            break;
-          }
-
-          case 'edit': {
-            const target = args[0];
-            if (!target) {
-              console.log(chalk.red('Usage: /edit <file>'));
-            } else {
-              await this.editFile(target);
-            }
-            break;
-          }
-
-          case 'write': {
-            const [target, ...contentParts] = args;
-            if (!target || contentParts.length === 0) {
-              console.log(chalk.red('Usage: /write <file> <content>'));
-              console.log(chalk.gray('Tip: surround multi-word paths with quotes.'));
-            } else {
-              await this.writeFileContent(target, contentParts.join(' '), false);
-            }
-            break;
-          }
-
-          case 'append': {
-            const [target, ...contentParts] = args;
-            if (!target || contentParts.length === 0) {
-              console.log(chalk.red('Usage: /append <file> <content>'));
-              console.log(chalk.gray('Tip: surround multi-word paths with quotes.'));
-            } else {
-              await this.writeFileContent(target, `${contentParts.join(' ')}\n`, true);
-            }
-            break;
-          }
-
-          case 'shell': {
-            const command = args.join(' ').trim();
-            if (!command) {
-              console.log(chalk.red('Usage: /shell <command>'));
-              console.log(chalk.gray('Example: /shell ls -la'));
-            } else {
-              await this.executeShellCommand(command, false);
-            }
-            break;
-          }
-
-          case 'interactive': {
-            const command = args.join(' ').trim();
-            if (!command) {
-              console.log(chalk.red('Usage: /interactive <command>'));
-              console.log(chalk.gray('Example: /interactive vim file.txt'));
-            } else {
-              await this.executeShellCommand(command, true);
-            }
-            break;
-          }
-
-          case 'ls': {
-            const dir = args[0] || '.';
-            await this.listDirectory(dir);
-            break;
-          }
-
-          case 'cd': {
-            const newDir = args[0];
-            if (!newDir) {
-              console.log(chalk.yellow(`Current directory: ${this.currentDirectory}`));
-            } else {
-              try {
-                const absolute = path.resolve(this.currentDirectory, newDir);
-                const stats = await fs.promises.stat(absolute);
-                if (stats.isDirectory()) {
-                  this.currentDirectory = absolute;
-                  console.log(chalk.green(`✓ Changed to: ${this.currentDirectory}`));
-                } else {
-                  console.log(chalk.red('Error: Not a directory'));
-                }
-              } catch (error: any) {
-                console.log(chalk.red(`Error: ${error.message}`));
-              }
-            }
-            break;
-          }
-
-          case 'pwd': {
-            console.log(chalk.cyan(`Current directory: ${this.currentDirectory}`));
-            break;
-          }
-
-          case 'find': {
-            const pattern = args[0];
-            if (!pattern) {
-              console.log(chalk.red('Usage: /find <pattern>'));
-              console.log(chalk.gray('Example: /find "*.js"'));
-            } else {
-              await this.findFiles(pattern);
-            }
-            break;
-          }
-
-          case 'delete': {
-            const target = args[0];
-            if (!target) {
-              console.log(chalk.red('Usage: /delete <file_or_directory>'));
-            } else {
-              await this.deleteFileOrDirectory(target);
-            }
-            break;
-          }
 
           case 'history': {
             this.showCommandHistory();
@@ -994,20 +1034,24 @@ class GeminiStyleCLI {
 
           case 'help':
             this.printPanel('Commands', [
+              this.getThemedText('📁 File Operations (@)', 'cyan'),
+              this.getThemedText('@read <file>     View file with syntax highlighting', 'gray'),
+              this.getThemedText('@edit <file>     Interactive file editor', 'gray'),
+              this.getThemedText('@write <file>    Create or overwrite file', 'gray'),
+              this.getThemedText('@append <file>   Append text to file', 'gray'),
+              this.getThemedText('@delete <file>   Delete file or directory', 'gray'),
+              this.getThemedText('@ls [dir]        List directory contents', 'gray'),
+              this.getThemedText('@cd [dir]        Change directory', 'gray'),
+              this.getThemedText('@pwd             Show current directory', 'gray'),
+              this.getThemedText('@find <pattern>  Search for files', 'gray'),
+              this.getThemedText('@shell <cmd>     Run shell command', 'gray'),
+              this.getThemedText('@interactive     Run interactive command', 'gray'),
+              this.getThemedText('@help            Show file commands help', 'gray'),
+              this.getThemedText('', 'gray'),
+              this.getThemedText('⚙️ System Settings (/)', 'cyan'),
               this.getThemedText('/clear       Clear conversation history', 'gray'),
               this.getThemedText('/stats       Show conversation statistics', 'gray'),
               this.getThemedText('/file        Chat with file content', 'gray'),
-              this.getThemedText('/read        Preview a file with line numbers', 'gray'),
-              this.getThemedText('/edit        Interactive file editor', 'gray'),
-              this.getThemedText('/write       Overwrite a file with new content', 'gray'),
-              this.getThemedText('/append      Append text to a file', 'gray'),
-              this.getThemedText('/delete      Delete a file or directory', 'gray'),
-              this.getThemedText('/shell       Run a shell command', 'gray'),
-              this.getThemedText('/interactive Run interactive shell command', 'gray'),
-              this.getThemedText('/ls          List directory contents', 'gray'),
-              this.getThemedText('/cd          Change directory', 'gray'),
-              this.getThemedText('/pwd         Show current directory', 'gray'),
-              this.getThemedText('/find        Search for files', 'gray'),
               this.getThemedText('/history     Show command history', 'gray'),
               this.getThemedText('/model       Change model', 'gray'),
               this.getThemedText('/temp        Change temperature', 'gray'),

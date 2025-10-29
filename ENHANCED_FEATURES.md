@@ -45,33 +45,35 @@
 
 ## 🎯 Available Commands
 
-### File Operations
-- `/read <file> [start_line] [end_line]` - Preview file with line numbers
-- `/edit <file>` - Interactive file editor
-- `/write <file> <content>` - Overwrite file with new content
-- `/append <file> <content>` - Append text to file
-- `/delete <file_or_directory>` - Delete file or directory
+### 📁 File Operations (@) - Use @ for all file operations
+- `@read <file> [start] [end]` - View file with syntax highlighting
+- `@edit <file>` - Interactive file editor
+- `@write <file> <content>` - Create or overwrite file
+- `@append <file> <content>` - Append text to file
+- `@delete <file>` - Delete file or directory
+- `@ls [dir]` - List directory contents
+- `@cd [dir]` - Change directory
+- `@pwd` - Show current directory
+- `@find <pattern>` - Search for files
+- `@shell <command>` - Run shell command
+- `@interactive <command>` - Run interactive command
+- `@help` - Show file commands help
 
-### Shell Commands
-- `/shell <command>` - Run shell command (non-interactive)
-- `/interactive <command>` - Run interactive shell command
-- `/ls [directory]` - List directory contents
-- `/cd [directory]` - Change directory
-- `/pwd` - Show current directory
-- `/find <pattern>` - Search for files
-
-### System Commands
-- `/history` - Show command history
-- `/config` - Display current configuration
-- `/theme <theme>` - Change UI theme
-- `/model <model>` - Change AI model
-- `/temp <temperature>` - Change temperature
-
-### AI Commands
-- `/file <path> <message>` - Chat with file content
+### ⚙️ System Settings (/) - Use / for system settings
 - `/clear` - Clear conversation history
 - `/stats` - Show conversation statistics
+- `/file <path> <message>` - Chat with file content
+- `/history` - Show command history
+- `/model <model>` - Change AI model
+- `/temp <temperature>` - Change temperature
+- `/theme <theme>` - Change UI theme
+- `/config` - Display current configuration
+- `/exit` - Exit
 - `/help` - Show all available commands
+
+### 💬 Regular Chat - Just type your message
+- No prefix needed for normal AI conversations
+- Examples: "Hello", "Write a function", "Explain this code"
 
 ## 🎨 Themes
 

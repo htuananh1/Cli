@@ -133,26 +133,22 @@ Assistant> [streaming response...]
 | `/exit` | Exit interactive mode | `/exit` |
 | `/help` | Show help message | `/help` |
 
-#### 🆕 File Operations
+#### 📁 File Operations (@) - Use @ for all file operations
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/read` | View file with syntax highlighting | `/read src/cli.ts 1 20` |
-| `/edit` | Interactive file editor | `/edit config.json` |
-| `/write` | Create or overwrite file | `/write test.js "console.log('hello')"` |
-| `/append` | Append text to file | `/append log.txt "New entry"` |
-| `/delete` | Delete file or directory | `/delete old-file.txt` |
+| `@read` | View file with syntax highlighting | `@read src/cli.ts 1 20` |
+| `@edit` | Interactive file editor | `@edit config.json` |
+| `@write` | Create or overwrite file | `@write test.js "console.log('hello')"` |
+| `@append` | Append text to file | `@append log.txt "New entry"` |
+| `@delete` | Delete file or directory | `@delete old-file.txt` |
+| `@ls` | List directory contents | `@ls src/` |
+| `@cd` | Change directory | `@cd ../src` |
+| `@pwd` | Show current directory | `@pwd` |
+| `@find` | Search for files | `@find "*.js"` |
+| `@shell` | Run shell command | `@shell ls -la` |
+| `@interactive` | Run interactive command | `@interactive vim file.txt` |
 
-#### 🆕 Shell & Navigation
-| Command | Description | Example |
-|---------|-------------|---------|
-| `/shell` | Run shell command | `/shell ls -la` |
-| `/interactive` | Run interactive command | `/interactive vim file.txt` |
-| `/ls` | List directory contents | `/ls src/` |
-| `/cd` | Change directory | `/cd ../src` |
-| `/pwd` | Show current directory | `/pwd` |
-| `/find` | Search for files | `/find "*.js"` |
-
-#### 🆕 System & UI
+#### ⚙️ System Settings (/) - Use / for system settings
 | Command | Description | Example |
 |---------|-------------|---------|
 | `/history` | Show command history | `/history` |
