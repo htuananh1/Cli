@@ -10,6 +10,7 @@ A simple, powerful command-line interface for interacting with AI models through
 - 💬 **Interactive REPL**: Gemini-CLI inspired conversational interface
 - ♾️ **Unlimited Context**: No token limits - let the API handle it
 - 📁 **File Support**: Chat about code and documents
+- 🫧 **Gemini Bubbles**: Avatar-aligned conversation bubbles like gemini-cli
 - 🎨 **Gemini UI**: Conversation bubbles styled like gemini-cli
 - 🧭 **Context-Aware Prompt**: Built-in system prompt keeps replies grounded in history
 - 🔄 **Conversation Memory**: History maintained in session
@@ -79,6 +80,9 @@ ai-gateway "Review this code" --file ./src/app.ts
 
 # With system prompt
 ai-gateway --system "You are a helpful coding assistant"
+
+# With system prompt from file
+ai-gateway --prompt-file ./prompts/pair-programmer.txt
 ```
 
 ## 💬 Interactive Mode
@@ -86,28 +90,34 @@ ai-gateway --system "You are a helpful coding assistant"
 Just run `ai-gateway` to start chatting:
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║            AI Gateway CLI - Interactive Mode                ║
-╚════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════╗
+║        ✨  AI Gateway · Gemini-style CLI Experience              ║
+╠══════════════════════════════════════════════════════════════════╣
+║    Context-aware chat with unlimited memory in the terminal      ║
+╚══════════════════════════════════════════════════════════════════╝
 
-Model: deepseek/deepseek-v3.2-exp
-Temperature: 0.7
+Model: deepseek/deepseek-v3.2-exp  ·  Temperature: 0.7
 
-Commands:
-  /clear     - Clear conversation history
-  /stats     - Show conversation statistics
-  /file      - Chat with file content
-  /model     - Change model
-  /temp      - Change temperature
-  /exit      - Exit (or Ctrl+C)
-  /help      - Show this help
+╭──────────────────────────────────────────────────────────────────╮
+│ 🧭 Context Prompt                                                 │
+├──────────────────────────────────────────────────────────────────┤
+│ You are the AI Gateway CLI assistant. Maintain context and        │
+│ reference earlier discussion when it helps the user.              │
+╰──────────────────────────────────────────────────────────────────╯
 
-Just type your message and press Enter to chat!
-────────────────────────────────────────────────────────────
+Type /help for commands. Use Ctrl+C to exit.
+──────────────────────────────────────────────────────────────────
 
-You> Hello! How are you?
+        🧑 You
+╭──────────────────────────────────────────────────────────────────╮
+│ Hello! How are you?                                               │
+╰──────────────────────────────────────────────────────────────────╯
 
-Assistant> [streaming response...]
+╭──────────────────────────────────────────────────────────────────╮
+│ ✨ Assistant                                                       │
+├──────────────────────────────────────────────────────────────────┤
+│ [streaming response…]                                             │
+╰──────────────────────────────────────────────────────────────────╯
 ```
 
 ### Interactive Commands
@@ -122,6 +132,7 @@ Assistant> [streaming response...]
 | `/append` | Append text to a file | `/append ./notes.txt "More"` |
 | `/shell` | Run a shell command | `/shell ls -la` |
 | `/prompt` | View or update the contextual system prompt | `/prompt You are a creative tutor` |
+| `/prompt load` | Load a system prompt from a file | `/prompt load ./prompts/pair.txt` |
 | `/model` | Change or view current model | `/model openai/gpt-4` |
 | `/temp` | Change temperature (0.0-2.0) | `/temp 0.9` |
 | `/exit` | Exit interactive mode | `/exit` |

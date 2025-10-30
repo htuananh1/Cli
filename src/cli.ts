@@ -33,7 +33,8 @@ class GeminiStyleCLI {
   private config: Config;
   private conversationHistory: Message[] = [];
   private execAsync = promisify(exec);
-  private readonly bubbleWidth = 72;
+  private readonly bubbleWidth = 68;
+  private readonly userIndent = 8;
 
   constructor(config: Config) {
     this.config = config;
@@ -129,19 +130,24 @@ class GeminiStyleCLI {
   }
 
   private renderMessageBubble(role: Message['role'] | 'context', content: string, options?: { title?: string }): void {
+    const icon = this.getRoleIcon(role);
     const label = options?.title || this.getRoleLabel(role);
+    const header = `${icon} ${label}`;
     const color = this.getRoleColor(role);
     const lines = this.wrapContent(content, this.bubbleWidth);
-    const maxWidth = Math.max(this.stripAnsi(label).length, ...lines.map(line => this.stripAnsi(line).length));
+    const maxWidth = Math.max(this.stripAnsi(header).length, ...lines.map(line => this.stripAnsi(line).length));
     const horizontal = '─'.repeat(maxWidth + 2);
+    const indent = this.getBubbleIndent(role);
 
     console.log();
-    console.log(color(`╭─ ${label.padEnd(maxWidth, ' ')} ╮`));
+    console.log(indent + color(`╭${horizontal}╮`));
+    console.log(indent + color(`│ ${this.padAnsi(header, maxWidth)} │`));
+    console.log(indent + color(`├${horizontal}┤`));
     for (const line of lines) {
       const padding = ' '.repeat(maxWidth - this.stripAnsi(line).length);
-      console.log(color(`│ ${line}${padding} │`));
+      console.log(indent + color(`│ ${line}${padding} │`));
     }
-    console.log(color(`╰─${horizontal}─╯`));
+    console.log(indent + color(`╰${horizontal}╯`));
   }
 
   private getRoleLabel(role: Message['role'] | 'context'): string {
@@ -172,36 +178,96 @@ class GeminiStyleCLI {
     }
   }
 
+  private getRoleIcon(role: Message['role'] | 'context'): string {
+    switch (role) {
+      case 'user':
+        return '🧑';
+      case 'assistant':
+        return '✨';
+      case 'system':
+      case 'context':
+        return '🧭';
+      default:
+        return 'ℹ️';
+    }
+  }
+
+  private getBubbleIndent(role: Message['role'] | 'context'): string {
+    return role === 'user' ? ' '.repeat(this.userIndent) : '';
+  }
+
+  private padAnsi(input: string, width: number): string {
+    const length = this.stripAnsi(input).length;
+    if (length >= width) {
+      return input;
+    }
+    return input + ' '.repeat(width - length);
+  }
+
+  private centerAnsi(input: string, width: number): string {
+    const length = this.stripAnsi(input).length;
+    if (length >= width) {
+      return input;
+    }
+    const totalPadding = width - length;
+    const left = Math.floor(totalPadding / 2);
+    const right = totalPadding - left;
+    return `${' '.repeat(left)}${input}${' '.repeat(right)}`;
+  }
+
   private renderHeader(): void {
-    console.log(chalk.hex('#7E57C2').bold('\n╭──────────────────────────────────────────────╮'));
-    console.log(chalk.hex('#7E57C2').bold('│           AI Gateway · Gemini Mode           │'));
-    console.log(chalk.hex('#7E57C2').bold('╰──────────────────────────────────────────────╯'));
+    const accent = chalk.hex('#6C63FF').bold;
+    const width = 62;
+
+    console.log();
+    console.log(accent(`╔${'═'.repeat(width)}╗`));
+    console.log(accent(`║${this.centerAnsi('✨  AI Gateway · Gemini-style CLI', width)}║`));
+    console.log(accent(`╠${'═'.repeat(width)}╣`));
+    console.log(accent(`║${this.centerAnsi('Context-aware chat with unlimited memory', width)}║`));
+    console.log(accent(`╚${'═'.repeat(width)}╝`));
     console.log(chalk.gray(`Model: ${this.config.model}  ·  Temperature: ${this.config.temperature}`));
     if (this.config.systemPrompt) {
-      this.displayMessage('system', this.config.systemPrompt);
+      this.displayMessage('system', this.config.systemPrompt, 'Context Prompt');
     }
     console.log(chalk.gray('Type /help for commands. Use Ctrl+C to exit.'));
   }
 
   private renderCommandReference(): void {
-    this.printPanel(
-      'Commands',
-      [
-        chalk.gray('/clear       Clear conversation history'),
-        chalk.gray('/stats       Show conversation statistics'),
-        chalk.gray('/file        Chat with file content'),
-        chalk.gray('/read        Preview a file with line numbers'),
-        chalk.gray('/write       Overwrite a file with new content'),
-        chalk.gray('/append      Append text to a file'),
-        chalk.gray('/shell       Run a shell command'),
-        chalk.gray('/model       Change model'),
-        chalk.gray('/temp        Change temperature'),
-        chalk.gray('/prompt      View or update system prompt'),
-        chalk.gray('/exit        Exit'),
-        chalk.gray('/help        Show this help'),
-      ],
-      chalk.hex('#3949AB'),
-    );
+    const commands = [
+      { cmd: '/clear', desc: 'Clear conversation history' },
+      { cmd: '/stats', desc: 'Show conversation statistics' },
+      { cmd: '/file', desc: 'Chat with file content' },
+      { cmd: '/read', desc: 'Preview a file with line numbers' },
+      { cmd: '/write', desc: 'Overwrite a file with new content' },
+      { cmd: '/append', desc: 'Append text to a file' },
+      { cmd: '/shell', desc: 'Run a shell command' },
+      { cmd: '/model', desc: 'Change or list models' },
+      { cmd: '/temp', desc: 'Change response temperature' },
+      { cmd: '/prompt', desc: 'View or update system prompt' },
+      { cmd: '/prompt load', desc: 'Load a prompt from file' },
+      { cmd: '/exit', desc: 'Exit (or use Ctrl+C)' },
+      { cmd: '/help', desc: 'Show this help' },
+    ];
+
+    const rows: string[] = [];
+    const columnWidth = 40;
+    for (let i = 0; i < commands.length; i += 2) {
+      const left = commands[i];
+      const leftLabel = chalk.hex('#80CBC4')(left.cmd.padEnd(14));
+      const leftText = `${leftLabel}${chalk.gray(left.desc)}`;
+      const paddedLeft = this.padAnsi(leftText, columnWidth);
+
+      const right = commands[i + 1];
+      if (right) {
+        const rightLabel = chalk.hex('#80CBC4')(right.cmd.padEnd(14));
+        const rightText = `${rightLabel}${chalk.gray(right.desc)}`;
+        rows.push(`${paddedLeft}  ${rightText}`);
+      } else {
+        rows.push(paddedLeft);
+      }
+    }
+
+    this.printPanel('Commands', rows, chalk.hex('#3949AB'));
   }
 
   renderSessionHeader(includeCommands: boolean = false): void {
@@ -456,6 +522,19 @@ class GeminiStyleCLI {
     }
   }
 
+  private async loadPromptFromFile(filePath: string): Promise<string> {
+    const absolute = path.resolve(filePath);
+    const spinner = ora({ text: chalk.gray(`Loading prompt from ${absolute}`), spinner: 'dots' }).start();
+    try {
+      const prompt = await fs.promises.readFile(absolute, 'utf-8');
+      spinner.stop();
+      return prompt.trim();
+    } catch (error: any) {
+      spinner.stop();
+      throw new Error(error.message || 'Unable to read prompt file');
+    }
+  }
+
   async repl(): Promise<void> {
     console.clear();
     this.renderSessionHeader(true);
@@ -616,16 +695,33 @@ class GeminiStyleCLI {
 
           case 'prompt': {
             if (args.length === 0) {
-              this.displayMessage('system', this.config.systemPrompt || '(not set)');
-            } else if (args[0].toLowerCase() === 'reset') {
-              this.setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
-              console.log(chalk.green('✓ System prompt reset to default.'));
-              this.displayMessage('system', this.config.systemPrompt || '');
+              this.displayMessage('system', this.config.systemPrompt || '(not set)', 'Context Prompt');
             } else {
-              const newPrompt = args.join(' ');
-              this.setSystemPrompt(newPrompt);
-              console.log(chalk.green('✓ System prompt updated.'));
-              this.displayMessage('system', newPrompt);
+              const subcommand = args[0].toLowerCase();
+              if (subcommand === 'reset') {
+                this.setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+                console.log(chalk.green('✓ System prompt reset to default.'));
+                this.displayMessage('system', this.config.systemPrompt || '', 'Context Prompt');
+              } else if (subcommand === 'load') {
+                const file = args[1];
+                if (!file) {
+                  console.log(chalk.red('Usage: /prompt load <file>'));
+                } else {
+                  try {
+                    const prompt = await this.loadPromptFromFile(file);
+                    this.setSystemPrompt(prompt);
+                    console.log(chalk.green(`✓ Loaded prompt from ${path.resolve(file)}`));
+                    this.displayMessage('system', prompt, 'Context Prompt');
+                  } catch (error: any) {
+                    this.printPanel('Prompt Load Error', (error.message || 'Unable to load prompt').split('\n'), chalk.red);
+                  }
+                }
+              } else {
+                const newPrompt = args.join(' ');
+                this.setSystemPrompt(newPrompt);
+                console.log(chalk.green('✓ System prompt updated.'));
+                this.displayMessage('system', newPrompt, 'Context Prompt');
+              }
             }
             break;
           }
@@ -681,16 +777,27 @@ program
   .option('-m, --model <model>', 'Model to use', 'deepseek/deepseek-v3.2-exp')
   .option('-t, --temperature <number>', 'Temperature (0.0-2.0)', '0.7')
   .option('-s, --system <prompt>', 'System prompt')
+  .option('-p, --prompt-file <path>', 'Load system prompt from a file')
   .option('-f, --file <path>', 'Include file content')
   .option('--api-key <key>', 'API key (overrides AI_GATEWAY_API_KEY env var)')
   .option('--base-url <url>', 'Base URL for AI Gateway', 'https://ai-gateway.vercel.sh/v1')
   .action(async (message: string | undefined, options: any) => {
+    let systemPrompt: string | undefined = options.system;
+    if (!systemPrompt && options.promptFile) {
+      try {
+        systemPrompt = fs.readFileSync(path.resolve(options.promptFile), 'utf-8').trim();
+      } catch (error: any) {
+        console.error(chalk.red(`Failed to load prompt file: ${error.message}`));
+        process.exit(1);
+      }
+    }
+
     const config: Config = {
       apiKey: options.apiKey || process.env.AI_GATEWAY_API_KEY || '',
       baseUrl: options.baseUrl,
       model: options.model,
       temperature: parseFloat(options.temperature),
-      systemPrompt: options.system,
+      systemPrompt,
     };
 
     const cli = new GeminiStyleCLI(config);
