@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import TextInput from 'ink-text-input';
 import { ChatMessage } from '../types.js';
-import { MockProvider } from '../../providers/mock.js';
+import { megallmProvider } from '../../providers/megallm.js';
 
 interface ChatProps {
     onNewMessage: (msg: ChatMessage) => void;
@@ -22,7 +22,7 @@ const Chat: React.FC<ChatProps> = ({ onNewMessage }) => {
     setIsLoading(true);
 
     try {
-        const response = await MockProvider.sendMessage([...messages, userMsg]);
+        const response = await megallmProvider.sendMessage([...messages, userMsg]);
         const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: response, timestamp: Date.now() };
         setMessages(prev => [...prev, aiMsg]);
         onNewMessage(aiMsg);
