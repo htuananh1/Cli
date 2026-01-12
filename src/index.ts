@@ -4,6 +4,7 @@ import { render } from 'ink';
 import App from './ui/App.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { startMobilePasteServer } from './commands/paste.js';
 
 const program = new Command();
 
@@ -28,6 +29,13 @@ program.command('doctor')
     console.log(chalk.green('✓ Git'));
     console.log(chalk.yellow('! ripgrep (optional, recommended)'));
     console.log(chalk.green('All systems go!'));
+  });
+
+program.command('mobile-paste')
+  .description('Start a local server to receive text from mobile devices')
+  .option('-p, --port <number>', 'Port to run the server on', '3000')
+  .action((options) => {
+    startMobilePasteServer(parseInt(options.port));
   });
 
 program.parse(process.argv);
